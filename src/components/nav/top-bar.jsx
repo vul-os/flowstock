@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Menu, User, ChevronDown, Building2 } from 'lucide-react';
 import { AuthContext } from '@/context/use-auth';
-import Logo from '/src/assets/flowstock-logo.svg';
-import LogoFallback from '/src/assets/cackle.png';
+import Logo from '@/assets/flowstock-logo.svg';
+import LogoFallback from '@/assets/flowstock.png';
 
 const TopBar = ({ onMenuClick }) => {
   const { user, signOut, organizations, activeOrganization, switchOrganization } = useContext(AuthContext);

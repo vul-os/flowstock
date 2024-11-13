@@ -5,24 +5,26 @@
   <!-- Top horizontal line of F -->
   <path d="M60 50 L140 50" 
         stroke="#2563eb" 
-        stroke-width="12" 
+        stroke-width="14" 
         fill="none" 
         stroke-linecap="round"/>
   
   <!-- Middle horizontal line of F -->
   <path d="M60 100 L120 100" 
         stroke="#2563eb" 
-        stroke-width="12" 
+        stroke-width="14" 
         fill="none" 
         stroke-linecap="round"/>
   
   <!-- Vertical line of F -->
   <path d="M60 50 L60 150" 
         stroke="#2563eb" 
-        stroke-width="12" 
+        stroke-width="14" 
         fill="none" 
         stroke-linecap="round"/>
   
-  <!-- Flow indicator dot -->
-  <circle cx="60" cy="150" r="8" fill="#1d4ed8"/>
+  <!-- Flow indicator dots -->
+  <circle cx="60" cy="150" r="12" fill="#1d4ed8"/>
+  <circle cx="140" cy="50" r="12" fill="#1d4ed8"/>
+  <circle cx="120" cy="100" r="12" fill="#1d4ed8"/>
 </svg>
