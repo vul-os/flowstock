@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Base circle representing stock/inventory -->
+  <circle cx="100" cy="100" r="90" fill="#f0f0f0" />
+  
+  <!-- Top horizontal line of F -->
+  <path d="M60 50 L140 50" 
+        stroke="#2563eb" 
+        stroke-width="12" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- Middle horizontal line of F -->
+  <path d="M60 100 L120 100" 
+        stroke="#2563eb" 
+        stroke-width="12" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- Vertical line of F -->
+  <path d="M60 50 L60 150" 
+        stroke="#2563eb" 
+        stroke-width="12" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- Flow indicator dot -->
+  <circle cx="60" cy="150" r="8" fill="#1d4ed8"/>
+</svg>
