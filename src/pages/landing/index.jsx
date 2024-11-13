@@ -3,7 +3,6 @@ import Header from "./header";
 import Hero from "./hero";
 import CTA from "./cta";
 import Features from "./features";
-import Testimonials from "./testimonials";
 import Footer from "./footer";
 
 export function LandingPage() {
@@ -12,7 +11,6 @@ export function LandingPage() {
         <Header />
         <Hero />
         <Features />
-        <Testimonials />
         <CTA />
         <Footer />
       </div>
