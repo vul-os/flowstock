@@ -22,6 +22,11 @@ import LandingPage from './pages/landing';
 import Home from './pages/home';
 import ProductManagement from './pages/products';
 import SettingsPage from './pages/settings';
+import ProductPage from './pages/products/product';
+import ServicesPage from './pages/services';
+import PurchaseOrdersPage from './pages/purchase-orders';
+import OrdersPage from './pages/orders';
+import PartnersPage from './pages/partners';
 
 const AppRoutes = () => {
   return (
@@ -42,6 +47,12 @@ const AppRoutes = () => {
       <Route element={<MainLayout />}>
         <Route path="/admin" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/admin/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
+        <Route path="/admin/products/:id" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
+        <Route path="/admin/services" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
+        <Route path="/admin/purchase-orders" element={<ProtectedRoute><PurchaseOrdersPage /></ProtectedRoute>} />
+        <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+        <Route path="/admin/partners" element={<ProtectedRoute><PartnersPage /></ProtectedRoute>} />
+
         <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />

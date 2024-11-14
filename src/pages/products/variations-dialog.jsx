@@ -1,3 +1,4 @@
+// variations.jsx
 import React from 'react';
 import {
   Dialog,
@@ -18,6 +19,35 @@ const ProductVariationDialog = ({
   setVariationForm,
   onSave,
 }) => {
+  const handleAttributeChange = (key, value) => {
+    setVariationForm(prev => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [key]: value
+      }
+    }));
+  };
+
+  const addNewAttribute = () => {
+    setVariationForm(prev => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        '': ''
+      }
+    }));
+  };
+
+  const removeAttribute = (keyToRemove) => {
+    const newAttributes = { ...variationForm.attributes };
+    delete newAttributes[keyToRemove];
+    setVariationForm(prev => ({
+      ...prev,
+      attributes: newAttributes
+    }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -36,9 +66,9 @@ const ProductVariationDialog = ({
             />
           </div>
           <div>
-            <Label htmlFor="variation-name">Name</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
-              id="variation-name"
+              id="name"
               value={variationForm.name}
               onChange={(e) => setVariationForm({ ...variationForm, name: e.target.value })}
             />
@@ -53,29 +83,50 @@ const ProductVariationDialog = ({
             />
           </div>
           <div>
-            <Label htmlFor="stock_quantity">Stock</Label>
+            <Label htmlFor="stock">Stock Quantity</Label>
             <Input
-              id="stock_quantity"
+              id="stock"
               type="number"
               value={variationForm.stock_quantity}
               onChange={(e) => setVariationForm({ ...variationForm, stock_quantity: e.target.value })}
             />
           </div>
+          
           <div>
-            <Label htmlFor="attributes">Attributes (JSON)</Label>
-            <Input
-              id="attributes"
-              value={JSON.stringify(variationForm.attributes)}
-              onChange={(e) => {
-                try {
-                  const attributes = JSON.parse(e.target.value);
-                  setVariationForm({ ...variationForm, attributes });
-                } catch (error) {
-                  // Handle invalid JSON input
-                }
-              }}
-              placeholder='{"color": "red", "size": "XL"}'
-            />
+            <Label>Attributes</Label>
+            {Object.entries(variationForm.attributes || {}).map(([key, value]) => (
+              <div key={key} className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Attribute name"
+                  value={key}
+                  onChange={(e) => {
+                    const oldAttributes = { ...variationForm.attributes };
+                    delete oldAttributes[key];
+                    handleAttributeChange(e.target.value, value);
+                  }}
+                />
+                <Input
+                  placeholder="Value"
+                  value={value}
+                  onChange={(e) => handleAttributeChange(key, e.target.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeAttribute(key)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addNewAttribute}
+              className="mt-2"
+            >
+              Add Attribute
+            </Button>
           </div>
         </div>
         <DialogFooter>
