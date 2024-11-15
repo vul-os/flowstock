@@ -27,6 +27,10 @@ import ServicesPage from './pages/services';
 import PurchaseOrdersPage from './pages/purchase-orders';
 import OrdersPage from './pages/orders';
 import PartnersPage from './pages/partners';
+import CreditorsPage from './pages/creditors-debtors'; 
+import CreditorsDebtorsPage from './pages/creditors-debtors';
+import ReportsPage from './pages/reports';
+
 
 const AppRoutes = () => {
   return (
@@ -52,6 +56,10 @@ const AppRoutes = () => {
         <Route path="/admin/purchase-orders" element={<ProtectedRoute><PurchaseOrdersPage /></ProtectedRoute>} />
         <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/admin/partners" element={<ProtectedRoute><PartnersPage /></ProtectedRoute>} />
+        <Route path="/admin/creditors-debtors" element={<ProtectedRoute><CreditorsDebtorsPage /></ProtectedRoute>} /> 
+
+        <Route path="/admin/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} /> 
+
 
         <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 

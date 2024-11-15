@@ -10,6 +10,7 @@ import {
   Wallet,
   Users,
   Settings,
+  FileText, // Added for Reports
 } from "lucide-react";
 import { NavItem } from "./nav-item";
 import { AuthContext } from "@/context/use-auth";
@@ -17,12 +18,12 @@ import { AuthContext } from "@/context/use-auth";
 const navItems = [
   { to: "/admin", icon: Home, text: "Home" },
   { to: "/admin/products", icon: Package, text: "Products" },
-  { to: "/admin/partners", icon: Handshake, text: "Partners" }, // Changed to Handshake for better representation of partnerships
+  { to: "/admin/partners", icon: Handshake, text: "Partners" },
   { to: "/admin/services", icon: Wrench, text: "Services" },
-  { to: "/admin/purchase-orders", icon: ShoppingCart, text: "Purchase Orders" }, // Changed to ShoppingCart for purchases
-  { to: "/admin/orders", icon: Receipt, text: "Orders" }, // Changed to Receipt for better distinction from purchase orders
-  { to: "/admin/creditors", icon: ArrowDownToLine, text: "Creditors" },
-  { to: "/admin/debtors", icon: Wallet, text: "Debtors" }, // Changed to Wallet for financial context
+  { to: "/admin/purchase-orders", icon: ShoppingCart, text: "Purchase Orders" },
+  { to: "/admin/orders", icon: Receipt, text: "Orders" },
+  { to: "/admin/reports", icon: FileText, text: "Reports" }, // Added Reports route
+  { to: "/admin/creditors-debtors", icon: ArrowDownToLine, text: "Creditors & Debtors" },
   { to: "/admin/settings", icon: Settings, text: "Settings" }
 ];
 
