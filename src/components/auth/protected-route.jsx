@@ -1,6 +1,5 @@
-// ProtectedRoute.jsx
-import React, { useContext, useEffect } from 'react';
-import { useLocation, useNavigate, Navigate } from 'react-router-dom';
+import React, { useContext, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Progress } from "@/components/ui/progress";
 import { AuthContext } from '../../context/use-auth';
 
@@ -10,13 +9,25 @@ const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
+  const isMounted = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && isMounted.current) {
       const currentPath = location.pathname + location.search;
-      localStorage.setItem(REDIRECT_STORAGE_KEY, currentPath);
+      console.log(currentPath)
+      if (!user) {
+        localStorage.setItem(REDIRECT_STORAGE_KEY, currentPath);
+        navigate('/login');
+      } else {
+        const redirectPath = localStorage.getItem(REDIRECT_STORAGE_KEY);
+        if (redirectPath) {
+          localStorage.removeItem(REDIRECT_STORAGE_KEY);
+          navigate(redirectPath);
+        }
+      }
     }
-  }, [user, loading, location]);
+    isMounted.current = true;
+  }, [user, loading]);
 
   if (loading) {
     return (
@@ -26,11 +37,7 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  return children;
+  return user ? children : null;
 };
 
 export default ProtectedRoute;
