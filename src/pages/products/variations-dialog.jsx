@@ -1,3 +1,4 @@
+// variations.jsx
 import React from 'react';
 import {
   Dialog,
@@ -5,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,11 +55,6 @@ const ProductVariationDialog = ({
           <DialogTitle>
             {selectedVariation ? 'Edit Variation' : 'Add New Variation'}
           </DialogTitle>
-          <DialogDescription>
-            {selectedVariation 
-              ? 'Update the details of this product variation.' 
-              : 'Create a new variation for this product.'}
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -67,8 +62,7 @@ const ProductVariationDialog = ({
             <Input
               id="sku"
               value={variationForm.sku}
-              onChange={(e) => setVariationForm(prev => ({ ...prev, sku: e.target.value }))}
-              placeholder="Enter SKU"
+              onChange={(e) => setVariationForm({ ...variationForm, sku: e.target.value })}
             />
           </div>
           <div>
@@ -76,8 +70,7 @@ const ProductVariationDialog = ({
             <Input
               id="name"
               value={variationForm.name}
-              onChange={(e) => setVariationForm(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Enter variation name"
+              onChange={(e) => setVariationForm({ ...variationForm, name: e.target.value })}
             />
           </div>
           <div>
@@ -85,11 +78,8 @@ const ProductVariationDialog = ({
             <Input
               id="price"
               type="number"
-              min="0"
-              step="0.01"
               value={variationForm.price}
-              onChange={(e) => setVariationForm(prev => ({ ...prev, price: e.target.value }))}
-              placeholder="Enter price"
+              onChange={(e) => setVariationForm({ ...variationForm, price: e.target.value })}
             />
           </div>
           <div>
@@ -97,45 +87,39 @@ const ProductVariationDialog = ({
             <Input
               id="stock"
               type="number"
-              min="0"
               value={variationForm.stock_quantity}
-              onChange={(e) => setVariationForm(prev => ({ ...prev, stock_quantity: e.target.value }))}
-              placeholder="Enter stock quantity"
+              onChange={(e) => setVariationForm({ ...variationForm, stock_quantity: e.target.value })}
             />
           </div>
           
           <div>
             <Label>Attributes</Label>
-            <div className="space-y-2">
-              {Object.entries(variationForm.attributes || {}).map(([key, value], index) => (
-                <div key={`${key}-${index}`} className="flex gap-2">
-                  <Input
-                    placeholder="Attribute name"
-                    value={key}
-                    onChange={(e) => {
-                      const oldAttributes = { ...variationForm.attributes };
-                      delete oldAttributes[key];
-                      handleAttributeChange(e.target.value, value);
-                    }}
-                  />
-                  <Input
-                    placeholder="Value"
-                    value={value}
-                    onChange={(e) => handleAttributeChange(key, e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeAttribute(key)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-            </div>
+            {Object.entries(variationForm.attributes || {}).map(([key, value]) => (
+              <div key={key} className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Attribute name"
+                  value={key}
+                  onChange={(e) => {
+                    const oldAttributes = { ...variationForm.attributes };
+                    delete oldAttributes[key];
+                    handleAttributeChange(e.target.value, value);
+                  }}
+                />
+                <Input
+                  placeholder="Value"
+                  value={value}
+                  onChange={(e) => handleAttributeChange(key, e.target.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeAttribute(key)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
             <Button
-              type="button"
               variant="outline"
               size="sm"
               onClick={addNewAttribute}
@@ -146,10 +130,10 @@ const ProductVariationDialog = ({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={onSave}>
+          <Button onClick={onSave}>
             {selectedVariation ? 'Update' : 'Create'}
           </Button>
         </DialogFooter>
