@@ -1,20 +1,163 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
-import Eg from './eg.avif'
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ChevronRight, ArrowLeft, Save, Edit2, X } from "lucide-react";
+import { supabase } from '@/services/supabaseClient';
+import { toast } from '@/components/ui/use-toast';
+
+// Default state structure
+const defaultProductData = {
+  material: '',
+  assortment: '',
+  applications: '',
+  specifications: {
+    lengthRange: '',
+    material: '',
+    finish: '',
+    headType: '',
+    threadType: '',
+    packageQuantity: ''
+  }
+};
 
 const ProductPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState({
+    id: '',
+    name: '',
+    description: '',
+    product_data: defaultProductData
+  });
+
+  // Fetch product data
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        // Ensure product_data and specifications exist with default values
+        const product_data = data.product_data || {};
+        const specifications = product_data.specifications || {};
+        
+        setProduct({
+          ...data,
+          product_data: {
+            material: product_data.material || '',
+            assortment: product_data.assortment || '',
+            applications: product_data.applications || '',
+            specifications: {
+              lengthRange: specifications.lengthRange || '',
+              material: specifications.material || '',
+              finish: specifications.finish || '',
+              headType: specifications.headType || '',
+              threadType: specifications.threadType || '',
+              packageQuantity: specifications.packageQuantity || ''
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch product details",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchProduct();
+  }, [id]);
+
+  // Handle save
+  const handleSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: product.name,
+          description: product.description,
+          product_data: product.product_data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Product updated successfully"
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle field changes
+  const handleChange = (field, value, nestedField) => {
+    if (nestedField) {
+      setProduct(prev => ({
+        ...prev,
+        product_data: {
+          ...prev.product_data,
+          specifications: {
+            ...prev.product_data.specifications,
+            [nestedField]: value
+          }
+        }
+      }));
+    } else if (field in product) {
+      setProduct(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    } else {
+      setProduct(prev => ({
+        ...prev,
+        product_data: {
+          ...prev.product_data,
+          [field]: value
+        }
+      }));
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  // Ensure product_data and specifications exist
+  const product_data = product.product_data || defaultProductData;
+  const specifications = product_data.specifications || {};
+
   return (
     <main className="min-h-screen bg-white dark:bg-neutral-900">
-      {/* Back Button */}
+      {/* Back Button and Edit Controls */}
       <div className="border-b border-neutral-100 dark:border-neutral-800">
-        <div className="mx-auto max-w-7xl px-8 py-4">
+        <div className="mx-auto max-w-7xl px-8 py-4 flex justify-between items-center">
           <Link 
             to="/admin/products"
             className="inline-flex items-center text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
@@ -22,43 +165,64 @@ const ProductPage = () => {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Products
           </Link>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button onClick={() => setIsEditing(false)} variant="outline">
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button onClick={handleSave}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit Product
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-8 py-12">
-        {/* Top Section - Title, Description, and Image */}
+        {/* Top Section - Title, Description */}
         <div className="mb-16 grid gap-16 lg:grid-cols-2">
-          <div>
-            <h1 className="mb-6 text-6xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
-              SF-AB A765
-            </h1>
-            <p className="mb-8 text-xl text-neutral-600 dark:text-neutral-400">
-              Assorted Screw Set
-            </p>
-            <p className="text-pretty text-lg leading-relaxed text-neutral-600 dark:text-neutral-400">
-              Introducing the SF-AB A765 Assorted Screw Set – the ultimate solution for your screw fastening needs. This comprehensive set includes a wide variety of screws meticulously curated to tackle various projects with ease and precision.
-            </p>
-          </div>
-          
-          <div className="flex items-start justify-end">
-            <img 
-              src={Eg} 
-              alt="Mockup boxes of assorted screw set"
-              className="max-w-xl rounded-lg object-contain"
-            />
+          <div className="space-y-6">
+            {isEditing ? (
+              <>
+                <Input
+                  value={product.name || ''}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  className="text-4xl font-bold"
+                  placeholder="Product Name"
+                />
+                <Textarea
+                  value={product.description || ''}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  className="h-32"
+                  placeholder="Product Description"
+                />
+              </>
+            ) : (
+              <>
+                <h1 className="text-6xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
+                  {product.name}
+                </h1>
+                <p className="text-pretty text-lg leading-relaxed text-neutral-600 dark:text-neutral-400">
+                  {product.description}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
         {/* Tabs Section */}
-        <Tabs defaultValue="description" className="w-full">
+        <Tabs defaultValue="specifications" className="w-full">
           <TabsList className="mb-8 inline-flex w-auto space-x-8 rounded-none border-b border-neutral-200 bg-transparent p-0 dark:border-neutral-700">
-            <TabsTrigger 
-              value="description" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-base font-medium data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400"
-            >
-              Description
-            </TabsTrigger>
             <TabsTrigger 
               value="specifications" 
               className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-base font-medium data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400"
@@ -67,80 +231,41 @@ const ProductPage = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="description">
-            <div className="grid gap-16 lg:grid-cols-2">
-              <div>
-                <h2 className="mb-4 text-3xl font-bold text-neutral-800 dark:text-neutral-200">
-                  Versatile Screw Fastening Solutions
-                </h2>
-                <p className="mb-8 text-lg text-neutral-600 dark:text-neutral-400">
-                  The SF-AB A765 Assorted Screw Set offers unmatched versatility and convenience, making it the perfect choice for DIY enthusiasts and professionals alike.
-                </p>
-                <Button 
-                  size="lg" 
-                  className="group rounded-full bg-blue-600 px-8 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
-                >
-                  Contact sales to learn more
-                  <ChevronRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </div>
-
-              <div className="grid gap-8 md:grid-cols-2">
-                {[
-                  {
-                    title: "Wide Variety",
-                    description: "Includes a diverse range of screw types and sizes to accommodate various applications and materials."
-                  },
-                  {
-                    title: "Ease of Use",
-                    description: "Each screw is designed for effortless installation, ensuring hassle-free fastening every time."
-                  },
-                  {
-                    title: "Convenience",
-                    description: "Eliminates the need for multiple trips to the hardware store, saving time and effort."
-                  },
-                  {
-                    title: "Quality",
-                    description: "Premium materials and precision engineering ensure long-lasting performance."
-                  }
-                ].map((feature, index) => (
-                  <div key={index}>
-                    <h3 className="mb-2 text-lg font-bold text-neutral-800 dark:text-neutral-200">
-                      {feature.title}
-                    </h3>
-                    <p className="text-neutral-600 dark:text-neutral-400">
-                      {feature.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
           <TabsContent value="specifications">
             <div className="grid gap-16 lg:grid-cols-2">
               <div className="space-y-8">
                 {[
                   {
+                    key: 'material',
                     title: "Material",
-                    description: "High-quality stainless steel construction ensuring durability and corrosion resistance."
+                    value: product_data.material
                   },
                   {
+                    key: 'assortment',
                     title: "Assortment",
-                    description: "Comprehensive selection including wood screws, machine screws, and sheet metal screws."
+                    value: product_data.assortment
                   },
                   {
+                    key: 'applications',
                     title: "Applications",
-                    description: "Suitable for woodworking, metalworking, and general construction projects."
+                    value: product_data.applications
                   }
-                ].map((spec, index) => (
-                  <div key={index}>
+                ].map((spec) => (
+                  <div key={spec.key}>
                     <h3 className="mb-2 text-lg font-bold text-neutral-800 dark:text-neutral-200">
                       {spec.title}
                     </h3>
-                    <p className="text-neutral-600 dark:text-neutral-400">
-                      {spec.description}
-                    </p>
+                    {isEditing ? (
+                      <Textarea
+                        value={spec.value || ''}
+                        onChange={(e) => handleChange(spec.key, e.target.value)}
+                        className="h-24"
+                      />
+                    ) : (
+                      <p className="text-neutral-600 dark:text-neutral-400">
+                        {spec.value}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -160,19 +285,27 @@ const ProductPage = () => {
                     </thead>
                     <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
                       {[
-                        { spec: "Length Range", value: "10-50mm" },
-                        { spec: "Material", value: "Stainless Steel" },
-                        { spec: "Finish", value: "Zinc Plated" },
-                        { spec: "Head Type", value: "Various" },
-                        { spec: "Thread Type", value: "Multiple" },
-                        { spec: "Package Quantity", value: "500+ pcs" }
-                      ].map((row, index) => (
-                        <tr key={index}>
+                        { key: 'lengthRange', label: 'Length Range' },
+                        { key: 'material', label: 'Material' },
+                        { key: 'finish', label: 'Finish' },
+                        { key: 'headType', label: 'Head Type' },
+                        { key: 'threadType', label: 'Thread Type' },
+                        { key: 'packageQuantity', label: 'Package Quantity' }
+                      ].map((row) => (
+                        <tr key={row.key}>
                           <td className="py-4 text-neutral-600 dark:text-neutral-400">
-                            {row.spec}
+                            {row.label}
                           </td>
                           <td className="py-4 text-right text-neutral-600 dark:text-neutral-400">
-                            {row.value}
+                            {isEditing ? (
+                              <Input
+                                value={specifications[row.key] || ''}
+                                onChange={(e) => handleChange('specifications', e.target.value, row.key)}
+                                className="text-right"
+                              />
+                            ) : (
+                              specifications[row.key] || ''
+                            )}
                           </td>
                         </tr>
                       ))}
