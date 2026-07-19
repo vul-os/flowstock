@@ -55,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Joining a workspace now records the joined peer's identity and acknowledged
   vector on the real peer row (previously written to a throwaway id and lost).
+- **`POST /api/sync/settings` no longer clears the shared secret when the
+  field is omitted.** Previously `secret` was the only field written through
+  unconditionally — `port`, `bind_addr` and `folder` already treated omission
+  as "leave unchanged" — so any partial update from a script or non-bundled
+  client silently destroyed the pairing secret and broke sync for every
+  enrolled peer. `secret` now follows the same pointer contract as `folder`:
+  omitted = unchanged, an explicit `""` = clear it deliberately. This is an
+  **API contract change**: a caller that relied on omission clearing the
+  secret must now send `"secret": ""` explicitly. The bundled UI always sent
+  the field back anyway, so it is unaffected.
 
 ## [1.0.0] - 2026-07-19
 

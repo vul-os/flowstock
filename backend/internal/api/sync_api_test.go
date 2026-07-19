@@ -315,19 +315,42 @@ func TestCompactWithoutASnapshotDirOnlyPrunes(t *testing.T) {
 	}
 }
 
-// SHARP EDGE, pinned deliberately: unlike port, bind_addr and folder — which all
-// treat a blank/omitted value as "leave unchanged" — the secret is written
-// through unconditionally, so a settings POST that omits it CLEARS it and
-// silently breaks every paired peer. The bundled UI always sends the secret back
-// from its form state, so this is not reachable from the app today; it is a trap
-// for any other client. Recorded here so a change to it is a deliberate one.
-func TestSyncSettingsSecretIsOverwrittenNotPreserved(t *testing.T) {
+// The secret uses the same pointer contract as folder: omitted means "leave
+// unchanged", consistent with port and bind_addr. A partial update from any
+// client — not just the bundled UI, which always resends the current value —
+// can therefore never silently clobber the pairing secret and break every
+// enrolled peer. An explicit empty string is the deliberate way to clear it.
+func TestSyncSettingsSecretOmittedLeavesItUnchanged(t *testing.T) {
 	h := newHarness(t)
 	h.setup()
 	_ = h.st.SetSetting("sync_secret", "established-secret")
 
 	h.mustJSON(h.do("POST", "/api/sync/settings", `{"listen":false}`), &map[string]any{})
+	if got := h.st.GetSetting("sync_secret"); got != "established-secret" {
+		t.Fatalf("omitting the secret must leave it configured, got %q", got)
+	}
+}
+
+// A partial update (e.g. just toggling listen, or just changing the port)
+// must not touch the secret at all — this is the concrete "trap" scenario the
+// omit-clears bug used to hit.
+func TestSyncSettingsPartialUpdateDoesNotClobberSecret(t *testing.T) {
+	h := newHarness(t)
+	h.setup()
+	_ = h.st.SetSetting("sync_secret", "established-secret")
+
+	var out map[string]any
+	h.mustJSON(h.do("POST", "/api/sync/settings", `{"listen":true,"port":"9001"}`), &out)
+	if out["secret"] != "established-secret" {
+		t.Fatalf("a partial update touching unrelated fields must not clobber the secret, got %v", out["secret"])
+	}
+	if h.st.GetSetting("sync_secret") != "established-secret" {
+		t.Fatal("the stored secret must be unchanged after a partial update")
+	}
+
+	// Explicit empty string is still the deliberate way to clear it.
+	h.mustJSON(h.do("POST", "/api/sync/settings", `{"listen":false,"secret":""}`), &out)
 	if got := h.st.GetSetting("sync_secret"); got != "" {
-		t.Fatalf("expected the documented (surprising) clear-on-omit behaviour, got %q", got)
+		t.Fatalf("an explicit empty secret must clear it, got %q", got)
 	}
 }

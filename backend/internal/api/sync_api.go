@@ -34,17 +34,26 @@ func (s *Server) handleSetSyncSettings(w http.ResponseWriter, r *http.Request) {
 		Listen   bool    `json:"listen"`
 		Port     string  `json:"port"`
 		BindAddr string  `json:"bind_addr"`
-		Secret   string  `json:"secret"`
+		Secret   *string `json:"secret"`
 		Folder   *string `json:"folder"`
 	}
 	if err := decode(r, &body); err != nil {
 		badRequest(w, err)
 		return
 	}
+	// Secret uses the same pointer contract as folder: omitted (nil) leaves it
+	// unchanged, matching port/bind_addr's "blank means unchanged" behaviour; an
+	// explicit "" clears it. A partial update from any client can therefore
+	// never silently destroy the pairing secret — clearing it is a deliberate,
+	// explicit act.
+	secret := s.Store.GetSetting("sync_secret")
+	if body.Secret != nil {
+		secret = *body.Secret
+	}
 	// FlowStock always serves the sync endpoints on its main listener; the
 	// "listen" flag just records the operator's intent and gates whether we
 	// advertise ourselves. Refuse to advertise without a secret (fail closed).
-	if body.Listen && body.Secret == "" {
+	if body.Listen && secret == "" {
 		badRequest(w, errSecret)
 		return
 	}
@@ -55,7 +64,9 @@ func (s *Server) handleSetSyncSettings(w http.ResponseWriter, r *http.Request) {
 	if body.BindAddr != "" {
 		_ = s.Store.SetSetting("sync_bind_addr", body.BindAddr)
 	}
-	_ = s.Store.SetSetting("sync_secret", body.Secret)
+	if body.Secret != nil {
+		_ = s.Store.SetSetting("sync_secret", secret)
+	}
 	// Optional shared-folder transport (Dropbox/Syncthing/NAS/USB). nil = leave
 	// unchanged; "" = disable.
 	if body.Folder != nil {
