@@ -226,7 +226,7 @@ const Dashboard = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <p className="page-subtitle">
             {businessName || "FlowStock"}
             {branchName ? ` · ${branchName}` : ""}
           </p>
@@ -262,7 +262,7 @@ const Dashboard = () => {
                 )}
               </div>
               <div className="mt-4">
-                <p className="data-figure text-2xl font-semibold">
+                <p className="data-figure whitespace-nowrap text-xl font-semibold leading-tight">
                   {stat.value}
                 </p>
                 <p className="text-sm text-muted-foreground">{stat.title}</p>
@@ -343,37 +343,67 @@ const Dashboard = () => {
           <CardContent>
             <div className="h-80">
               {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      dataKey="total"
-                      nameKey="name"
-                      stroke={chart.surface}
-                      strokeWidth={2}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell
-                          key={entry.name}
-                          fill={
-                            chart.categorical[index % chart.categorical.length]
-                          }
+                <div className="flex h-full flex-col">
+                  <div className="min-h-0 flex-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          innerRadius={48}
+                          outerRadius={78}
+                          paddingAngle={1}
+                          dataKey="total"
+                          nameKey="name"
+                          stroke={chart.surface}
+                          strokeWidth={2}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell
+                              key={entry.name}
+                              fill={
+                                chart.categorical[
+                                  index % chart.categorical.length
+                                ]
+                              }
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={chart.tooltip}
+                          formatter={(value) => fmtMoney(value)}
                         />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={chart.tooltip}
-                      formatter={(value) => fmtMoney(value)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="mt-1 space-y-1">
+                    {pieData.map((entry, index) => (
+                      <li
+                        key={entry.name}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                          style={{
+                            background:
+                              chart.categorical[
+                                index % chart.categorical.length
+                              ],
+                          }}
+                        />
+                        <span className="truncate text-muted-foreground">
+                          {entry.name}
+                        </span>
+                        <span className="data-figure ml-auto shrink-0 text-foreground">
+                          {fmtMoney(entry.total)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : (
                 <EmptyState
                   icon={Package2}

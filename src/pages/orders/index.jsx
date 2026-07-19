@@ -7,6 +7,7 @@ import {
   PencilLine,
   ChevronDown,
   ChevronRight,
+  Receipt,
 } from "lucide-react";
 import { api } from "@/services/api";
 import { useWorkspace, useTables } from "@/context/workspace-context";
@@ -29,6 +30,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/state";
 import OrderDialog from "./dialog";
 
 const STATUS_BADGE = {
@@ -256,24 +258,28 @@ const OrdersPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead></TableHead>
-                <TableHead>Order #</TableHead>
+                <TableHead className="whitespace-nowrap">Order #</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Branch</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead>Due Date</TableHead>
+                <TableHead className="whitespace-nowrap">Order date</TableHead>
+                <TableHead className="whitespace-nowrap">Due date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Total Amount</TableHead>
+                <TableHead className="whitespace-nowrap text-right">
+                  Total
+                </TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={9}
-                    className="py-8 text-center text-muted-foreground"
-                  >
-                    No orders yet. Create your first order to get started.
+                  <TableCell colSpan={9} className="p-0">
+                    <EmptyState
+                      icon={Receipt}
+                      title="No orders yet"
+                      description="Create your first order to get started — stock is deducted when you confirm it."
+                      className="border-0 bg-transparent"
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -298,7 +304,7 @@ const OrdersPage = () => {
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="whitespace-nowrap font-mono text-xs font-medium">
                         {order.order_number}
                       </TableCell>
                       <TableCell className="font-medium">
@@ -312,14 +318,20 @@ const OrdersPage = () => {
                       <TableCell>
                         {branchesById.get(order.branch_id)?.name || "—"}
                       </TableCell>
-                      <TableCell>{formatDate(order.order_date)}</TableCell>
-                      <TableCell>{formatDate(order.due_date)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDate(order.order_date)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDate(order.due_date)}
+                      </TableCell>
                       <TableCell>
                         <StatusBadge status={order.status} />
                       </TableCell>
-                      <TableCell>{fmtMoney(order.total_amount)}</TableCell>
+                      <TableCell className="cell-num whitespace-nowrap font-medium">
+                        {fmtMoney(order.total_amount)}
+                      </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap justify-end gap-1.5">
                           <Button
                             variant="ghost"
                             size="sm"
