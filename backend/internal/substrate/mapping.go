@@ -83,6 +83,29 @@
 //
 // Correcting a movement is an inverse movement, never an edit — which is the
 // same reason §4.5 is wrong for the ledger too: there is nothing to delete.
+//
+// # What it costs
+//
+// Measured on an Apple M2, with `go test -bench Open ./backend/internal/substrate`
+// and by building the binary at the commit before this package existed:
+//
+//	embedded engine artifact   426,890 bytes (417 KiB)
+//	flowstock binary           15,300,578 → 19,049,794 bytes (+3.58 MiB, +24.5%)
+//	Open, no cache             ~118 ms, once per process
+//	Open, warm cache           ~5.7 ms  (~20x)
+//
+// The binary delta is worth stating plainly, because the artifact size alone
+// understates it by an order of magnitude: only 417 KiB of those 3.58 MiB is the
+// engine. The rest is wazero's optimizing compiler, which is the price of
+// running WebAssembly without cgo — and cgo was the alternative FlowStock cannot
+// take, since it cross-compiles to a single static binary for laptops, shop
+// counters, NASes and Pis.
+//
+// The startup cost is close to irrelevant here: FlowStock is a daemon that syncs
+// on a one-minute timer, so it compiles once and amortizes over the process
+// lifetime. It is not nothing on a shop-counter PC that gets power-cycled daily,
+// which is why main.go passes a cache dir under the data directory and turns
+// 118ms into 6ms for every start after the first.
 package substrate
 
 import (

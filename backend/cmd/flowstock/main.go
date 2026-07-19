@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"flowstock/backend/internal/auth"
 	"flowstock/backend/internal/config"
 	"flowstock/backend/internal/store"
+	"flowstock/backend/internal/substrate"
 	syncpkg "flowstock/backend/internal/sync"
 )
 
@@ -63,11 +65,41 @@ func main() {
 	}
 	defer st.Close()
 
+	// The shared DMTAP sync engine, off unless asked for. When on it becomes the
+	// merge authority: FlowStock still owns storage, transport and identity, and
+	// the substrate's six-kind algebra decides which write wins.
+	//
+	// Compiling the engine is the expensive step (~200-400ms) and is paid once
+	// here, then amortized over the process lifetime — which is why a daemon
+	// syncing on a timer never pays it again. The compiled code is cached in the
+	// data dir so a restart pays roughly a tenth of it.
+	//
+	// A failure here is fatal on purpose. Starting anyway would silently run the
+	// built-in engine on a node an operator has configured for the substrate,
+	// and a mesh where different nodes merge by different algebras converges
+	// only by luck.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var substrateEngine *substrate.Engine
+	if cfg.SubstrateSync {
+		started := time.Now()
+		substrateEngine, err = substrate.OpenForStore(ctx, st, filepath.Join(cfg.DataDir, "wasm-cache"))
+		if err != nil {
+			log.Fatalf("substrate sync engine: %v", err)
+		}
+		defer substrateEngine.Close(context.Background())
+		st.SetMerger(substrateEngine)
+		log.Printf("substrate sync engine active (compiled in %s) — merges follow SYNC.md, not the built-in CRDT",
+			time.Since(started).Round(time.Millisecond))
+	}
+
 	syncEngine := syncpkg.New(st, func() string { return st.GetSetting("sync_secret") })
 	syncEngine.FolderFn = func() string { return st.GetSetting("sync_folder") }
 	syncEngine.AllowSecretFallback = cfg.SyncSecretFallback
 	apiServer := api.New(st, syncEngine, Version)
 	apiServer.SnapshotDir = cfg.DataDir
+	apiServer.Substrate = substrateEngine
 	authHandler := auth.New(cfg.Password)
 
 	mux := http.NewServeMux()
@@ -92,8 +124,6 @@ func main() {
 	mux.Handle("/", newFrontendHandler())
 
 	// Background peer sync once a minute.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	go syncEngine.RunBackground(ctx, time.Minute)
 
 	srv := &http.Server{

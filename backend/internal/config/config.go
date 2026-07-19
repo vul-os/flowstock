@@ -31,6 +31,16 @@ type Config struct {
 	// enrolled a key (the mesh fails closed). This is a compatibility escape
 	// hatch for mixed-version fleets.
 	SyncSecretFallback bool `json:"sync_secret_fallback,omitempty"`
+	// SubstrateSync, when true, makes the shared DMTAP sync engine
+	// (substrate/SYNC.md) the merge authority instead of FlowStock's own
+	// hand-rolled CRDT. Default false: the built-in engine decides.
+	//
+	// It is a deployment-wide switch, not a per-node preference. The two
+	// engines are each convergent but do not share a total order — FlowStock
+	// breaks an HLC tie on node id, the substrate on the author's public key —
+	// so a mesh running both can pick different winners for the same pair of
+	// concurrent writes. Every node in a workspace must agree.
+	SubstrateSync bool `json:"substrate_sync,omitempty"`
 }
 
 const configName = "flowstock.config.json"
@@ -65,6 +75,9 @@ func Load() *Config {
 	}
 	if v := os.Getenv("FLOWSTOCK_SYNC_SECRET_FALLBACK"); v == "1" || v == "true" {
 		cfg.SyncSecretFallback = true
+	}
+	if v := os.Getenv("FLOWSTOCK_SUBSTRATE_SYNC"); v == "1" || v == "true" {
+		cfg.SubstrateSync = true
 	}
 
 	// Defaults.

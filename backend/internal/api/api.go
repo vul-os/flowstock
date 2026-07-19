@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"flowstock/backend/internal/store"
+	"flowstock/backend/internal/substrate"
 	syncpkg "flowstock/backend/internal/sync"
 )
 
@@ -24,6 +25,9 @@ type Server struct {
 	// SnapshotDir is where compaction writes snapshot.json. Empty disables
 	// writing a snapshot to disk (compaction then only prunes).
 	SnapshotDir string
+	// Substrate is the shared sync engine when it is the merge authority, and
+	// nil when the built-in engine is. Exposed read-only, for status.
+	Substrate *substrate.Engine
 
 	subsMu sync.Mutex
 	subs   map[chan struct{}]bool
@@ -67,6 +71,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/sync/folder", s.handleSyncFolderNow)
 	mux.HandleFunc("POST /api/sync/compact", s.handleCompact)
 	mux.HandleFunc("POST /api/sync/test", s.handleTestPeer)
+
+	mux.HandleFunc("GET /api/substrate", s.handleSubstrate)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 }
