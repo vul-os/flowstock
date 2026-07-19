@@ -23,6 +23,23 @@ func (s *Server) movement(variantID, branchID string, qtyDelta float64, kind, re
 	return err
 }
 
+// receipt writes one immutable goods-receipt fact against a PO line item. The
+// line's received quantity is the SUM of these rows, so receipts from different
+// branches merge by union instead of clobbering an LWW counter.
+func (s *Server) receipt(poID, itemID, variantID, branchID string, qty float64, note string) error {
+	_, err := s.Store.LocalPut("po_receipts", store.NewID(), map[string]any{
+		"purchase_order_id": poID,
+		"po_item_id":        itemID,
+		"variant_id":        variantID,
+		"branch_id":         branchID,
+		"qty":               qty,
+		"note":              note,
+		"created_by":        s.Store.GetSetting("branch_name"),
+		"created_at":        nowISO(),
+	}, false)
+	return err
+}
+
 func (s *Server) branchID() string { return s.Store.GetSetting("branch_id") }
 
 func (s *Server) handleStockLevels(w http.ResponseWriter, r *http.Request) {

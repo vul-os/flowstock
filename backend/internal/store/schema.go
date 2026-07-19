@@ -53,9 +53,15 @@ var tables = []tableDef{
 	t("order_items", false, txt("order_id"), txt("product_variant_id"), real("quantity"), real("unit_price"), real("total_price")),
 	t("order_services", false, txt("order_id"), txt("service_id"), real("hours"), real("hourly_rate"), real("total_price"), txt("description")),
 	t("purchase_orders", false, txt("branch_id"), txt("supplier_id"), txt("po_number"), txt("order_date"), txt("expected_delivery_date"), txt("status"), real("subtotal"), real("tax_amount"), real("total_amount"), txt("notes"), txt("created_at")),
-	t("purchase_order_items", false, txt("purchase_order_id"), txt("item_type"), txt("product_variant_id"), txt("service_id"), real("quantity"), real("unit_price"), real("total_price"), txt("description"), txt("unit_type"), real("received_quantity")),
+	t("purchase_order_items", false, txt("purchase_order_id"), txt("item_type"), txt("product_variant_id"), txt("service_id"), real("quantity"), real("unit_price"), real("total_price"), txt("description"), txt("unit_type")),
 	t("payments", false, txt("party_kind"), txt("party_id"), txt("direction"), real("amount"), txt("payment_date"), txt("method"), txt("note"), txt("created_at")),
 	t("stock_movements", true, txt("variant_id"), txt("branch_id"), real("qty_delta"), txt("kind"), txt("ref_kind"), txt("ref_id"), txt("note"), txt("created_by"), txt("created_at")),
+	// po_receipts is an insert-only ledger of individual goods-receipt events,
+	// one row per "we received N of this line". A line's received quantity is
+	// SUM(qty) over its rows — never a stored LWW counter — so two branches
+	// receiving the same PO offline converge by union instead of clobbering
+	// each other's count (see api/orders.go handleReceivePO).
+	t("po_receipts", true, txt("purchase_order_id"), txt("po_item_id"), txt("variant_id"), txt("branch_id"), real("qty"), txt("note"), txt("created_by"), txt("created_at")),
 }
 
 func tableByName(name string) (tableDef, bool) {
@@ -121,6 +127,8 @@ func initSchema(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 		CREATE INDEX IF NOT EXISTS idx_order_services_order ON order_services(order_id);
 		CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_order_id);
+		CREATE INDEX IF NOT EXISTS idx_po_receipts_item ON po_receipts(po_item_id);
+		CREATE INDEX IF NOT EXISTS idx_po_receipts_po ON po_receipts(purchase_order_id);
 
 		CREATE TABLE IF NOT EXISTS oplog (
 			hlc TEXT PRIMARY KEY,

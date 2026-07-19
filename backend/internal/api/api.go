@@ -200,13 +200,22 @@ func (s *Server) handleListRows(w http.ResponseWriter, r *http.Request) {
 	if rows == nil {
 		rows = []map[string]any{}
 	}
+	// received_quantity is not stored on the line item; it is derived by SUM
+	// over the po_receipts ledger so concurrent branch receipts converge.
+	if tbl == "purchase_order_items" {
+		if received, err := s.Store.ReceivedByItem(); err == nil {
+			for _, row := range rows {
+				row["received_quantity"] = received[asString(row["id"])]
+			}
+		}
+	}
 	writeJSON(w, rows)
 }
 
 func (s *Server) handlePutRow(w http.ResponseWriter, r *http.Request) {
 	tbl := r.PathValue("tbl")
-	if tbl == "stock_movements" {
-		badRequest(w, fmt.Errorf("stock movements are written by stock operations only"))
+	if tbl == "stock_movements" || tbl == "po_receipts" {
+		badRequest(w, fmt.Errorf("%s is an append-only ledger written by domain operations only", tbl))
 		return
 	}
 	var body struct {
@@ -232,8 +241,8 @@ func (s *Server) handlePutRow(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteRow(w http.ResponseWriter, r *http.Request) {
 	tbl := r.PathValue("tbl")
 	id := r.PathValue("id")
-	if tbl == "stock_movements" {
-		badRequest(w, fmt.Errorf("stock movements are immutable"))
+	if tbl == "stock_movements" || tbl == "po_receipts" {
+		badRequest(w, fmt.Errorf("%s is an immutable ledger", tbl))
 		return
 	}
 	row, err := s.Store.GetRow(tbl, id)

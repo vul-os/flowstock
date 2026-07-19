@@ -192,6 +192,39 @@ func TestFreshNodeAdoptsOrgButEstablishedDoesNot(t *testing.T) {
 	}
 }
 
+func TestConcurrentPOReceivesConverge(t *testing.T) {
+	a := newNode(t, "A")
+	b := newNode(t, "B")
+	// One PO line item, ordered 10. Both branches receive a partial shipment
+	// while offline: A takes in 6, B takes in 4.
+	put(t, a, "purchase_order_items", "poi1", map[string]any{
+		"purchase_order_id": "po1", "item_type": "product", "product_variant_id": "v1", "quantity": 10.0,
+	}, false)
+	syncRound(t, a, b)
+
+	put(t, a, "po_receipts", "r1", map[string]any{
+		"purchase_order_id": "po1", "po_item_id": "poi1", "variant_id": "v1", "branch_id": "bA", "qty": 6.0,
+	}, false)
+	put(t, b, "po_receipts", "r2", map[string]any{
+		"purchase_order_id": "po1", "po_item_id": "poi1", "variant_id": "v1", "branch_id": "bB", "qty": 4.0,
+	}, false)
+
+	syncRound(t, a, b)
+	syncRound(t, a, b) // idempotent
+
+	// Both branches must agree the line is fully received (6 + 4), where a
+	// stored LWW received_quantity counter would have kept only 6 or only 4.
+	for _, n := range []*Store{a, b} {
+		got, err := n.ReceivedByItem()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got["poi1"] != 10.0 {
+			t.Fatalf("received for poi1 = %v, want 10 (union of both partial receipts)", got["poi1"])
+		}
+	}
+}
+
 func TestStaleOpDoesNotClobber(t *testing.T) {
 	a := newNode(t, "A")
 	b := newNode(t, "B")

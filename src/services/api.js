@@ -46,6 +46,13 @@ function makeHttpDriver() {
     bootstrap: () => req('GET', '/api/bootstrap'),
     setupWorkspace: (businessName, branchName) =>
       req('POST', '/api/setup', { business_name: businessName, branch_name: branchName }),
+    joinWorkspace: ({ url, secret, businessName, branchName }) =>
+      req('POST', '/api/workspace/join', {
+        url,
+        secret,
+        business_name: businessName,
+        branch_name: branchName,
+      }),
     updateSettings: (settings) => req('POST', '/api/settings', settings),
     listRows: (tbl) => req('GET', `/api/rows/${tbl}`),
     putRow: (tbl, id, data) => req('POST', `/api/rows/${tbl}`, { id: id || '', data }),
@@ -206,6 +213,9 @@ function makeDemoDriver() {
     },
     setupWorkspace: async () => {
       throw new Error('demo workspace is pre-configured');
+    },
+    joinWorkspace: async () => {
+      throw new Error('joining a workspace is not available in demo mode');
     },
     updateSettings: async (settings) => {
       Object.assign(load().settings, settings);

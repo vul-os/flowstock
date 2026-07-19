@@ -328,6 +328,12 @@ func (s *Server) handleReceivePO(w http.ResponseWriter, r *http.Request) {
 			itemByID[asString(it["id"])] = it
 		}
 	}
+	// received_quantity is derived from the po_receipts ledger, never stored.
+	received, err := s.Store.ReceivedByItem()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
 
 	for _, rc := range body.Receipts {
 		if rc.Qty <= 0 {
@@ -343,7 +349,10 @@ func (s *Server) handleReceivePO(w http.ResponseWriter, r *http.Request) {
 		}
 		variant := asString(item["product_variant_id"])
 		ordered := asFloat(item["quantity"])
-		already := asFloat(item["received_quantity"])
+		already := received[rc.ItemID]
+		// Best-effort local guard: offline branches can still over-receive
+		// concurrently (a real over-delivery), and the union ledger will faithfully
+		// reflect the true total — it never silently drops a receipt.
 		if already+rc.Qty > ordered+1e-9 {
 			badRequest(w, fmt.Errorf("receiving %.4g would exceed ordered quantity %.4g", already+rc.Qty, ordered))
 			return
@@ -355,16 +364,14 @@ func (s *Server) handleReceivePO(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
-		payload := stripEnvelope(item)
-		payload["received_quantity"] = already + rc.Qty
-		if _, err := s.Store.LocalPut("purchase_order_items", rc.ItemID, payload, false); err != nil {
+		if err := s.receipt(body.POID, rc.ItemID, variant, branchID, rc.Qty, ""); err != nil {
 			serverError(w, err)
 			return
 		}
-		itemByID[rc.ItemID]["received_quantity"] = already + rc.Qty
+		received[rc.ItemID] = already + rc.Qty
 	}
 
-	// Recompute PO status from receipts.
+	// Recompute PO status from the derived receipt totals.
 	var stockable []map[string]any
 	for _, it := range itemByID {
 		if asString(it["item_type"]) == "" || asString(it["item_type"]) == "product" {
@@ -374,10 +381,11 @@ func (s *Server) handleReceivePO(w http.ResponseWriter, r *http.Request) {
 	allReceived := len(stockable) > 0
 	anyReceived := false
 	for _, it := range stockable {
-		if asFloat(it["received_quantity"]) > 0 {
+		got := received[asString(it["id"])]
+		if got > 0 {
 			anyReceived = true
 		}
-		if asFloat(it["received_quantity"])+1e-9 < asFloat(it["quantity"]) {
+		if got+1e-9 < asFloat(it["quantity"]) {
 			allReceived = false
 		}
 	}

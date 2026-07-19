@@ -81,6 +81,8 @@ func main() {
 	// Protected application API.
 	appMux := http.NewServeMux()
 	apiServer.Routes(appMux)
+	// Pairing a fresh device into an existing workspace (pre-setup).
+	appMux.HandleFunc("POST /api/workspace/join", apiServer.HandleJoin)
 	mux.Handle("/api/", authHandler.Middleware(appMux))
 
 	// Frontend (embedded in release builds; dev-proxied otherwise).

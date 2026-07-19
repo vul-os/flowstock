@@ -485,6 +485,29 @@ func (s *Store) StockLevels() ([]StockLevel, error) {
 	return out, rows.Err()
 }
 
+// ReceivedByItem returns the received quantity per purchase-order line item,
+// derived as SUM(qty) over the insert-only po_receipts ledger. This is the
+// source of truth for "how much of this line has arrived": because it is a
+// union of immutable receipt facts, concurrent partial receipts on different
+// branches add up instead of overwriting one another.
+func (s *Store) ReceivedByItem() (map[string]float64, error) {
+	rows, err := s.db.Query("SELECT po_item_id, SUM(qty) FROM po_receipts GROUP BY po_item_id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]float64{}
+	for rows.Next() {
+		var item string
+		var qty float64
+		if err := rows.Scan(&item, &qty); err != nil {
+			return nil, err
+		}
+		out[item] = qty
+	}
+	return out, rows.Err()
+}
+
 // MovementsForRef returns movements written against a document (order/PO) of a
 // given kind — used to make status transitions idempotent.
 func (s *Store) MovementsForRef(refKind, refID, kind string) ([]map[string]any, error) {
