@@ -42,7 +42,11 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
     }
   }, [open, product]);
 
-  const isValid = form.name.trim() && form.category_id;
+  // A category is optional: a fresh workspace has none (categories are only
+  // ever read by the UI, never created), so requiring one made it impossible
+  // to add the first product on a real install. Uncategorised products render
+  // fine everywhere — the table simply omits the badge.
+  const isValid = Boolean(form.name.trim());
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -94,7 +98,7 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>Category (optional)</Label>
               <Select
                 value={form.category_id}
                 onValueChange={(value) =>
