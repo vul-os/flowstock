@@ -346,6 +346,9 @@ func (e *Engine) SyncAll(ctx context.Context, only string) []Result {
 		if !p.Enabled || (only != "" && p.ID != only) {
 			continue
 		}
+		if strings.TrimSpace(p.URL) == "" {
+			continue // inbound-only enrollment row: we authenticate it, never dial it
+		}
 		res := e.SyncPeer(ctx, p.ID, p.URL)
 		status := "ok: pushed " + itoa(res.Pushed) + ", pulled " + itoa(res.Pulled)
 		if !res.OK {

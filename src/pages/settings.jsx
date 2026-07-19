@@ -472,8 +472,8 @@ function PeerDialog({ open, onOpenChange, peer, onSaved }) {
         <DialogHeader>
           <DialogTitle>{peer ? 'Edit peer' : 'Add peer'}</DialogTitle>
           <DialogDescription>
-            A peer is another FlowStock device on your network. Use its address and sync
-            port, e.g. http://192.168.1.20:7365.
+            A peer is another FlowStock device on your network. Use its address (the same
+            host and port it serves FlowStock on), e.g. http://192.168.1.20:8787.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} className="space-y-4">
@@ -493,7 +493,7 @@ function PeerDialog({ open, onOpenChange, peer, onSaved }) {
               id="peer_url"
               value={form.url}
               onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-              placeholder="http://192.168.1.20:7365"
+              placeholder="http://192.168.1.20:8787"
               required
             />
           </div>
@@ -537,13 +537,18 @@ function PeerDialog({ open, onOpenChange, peer, onSaved }) {
 
 function SyncCard() {
   const { toast } = useToast();
+  // port/bindAddr are round-tripped for backend compatibility but not editable:
+  // sync shares the app's own HTTP port, so peers reach this device at the same
+  // address the UI is served on (see syncAddress below).
   const [form, setForm] = useState({
     listen: false,
-    port: '7365',
+    port: '8787',
     bindAddr: '0.0.0.0',
     secret: '',
     folder: '',
   });
+  const syncAddress =
+    typeof window !== 'undefined' && window.location ? window.location.origin : '';
   const [folderSyncing, setFolderSyncing] = useState(false);
   const [status, setStatus] = useState(null); // {listening, bind_addr, port}
   const [loadingCfg, setLoadingCfg] = useState(true);
@@ -556,16 +561,12 @@ function SyncCard() {
   const applyCfg = useCallback((cfg) => {
     setForm({
       listen: !!cfg.listen,
-      port: String(cfg.port ?? 7365),
+      port: String(cfg.port ?? 8787),
       bindAddr: cfg.bind_addr || '0.0.0.0',
       secret: cfg.secret || '',
       folder: cfg.folder || '',
     });
-    setStatus({
-      listening: !!cfg.listening,
-      bind_addr: cfg.bind_addr || '0.0.0.0',
-      port: cfg.port ?? 7365,
-    });
+    setStatus({ listening: !!cfg.listening });
   }, []);
 
   const loadPeers = useCallback(async () => {
@@ -742,8 +743,8 @@ function SyncCard() {
         <CardTitle>Sync</CardTitle>
         <CardDescription>
           Peers exchange changes whenever they can reach each other; a branch that was
-          offline simply catches up the next time it connects. All peers must share the
-          same secret.
+          offline simply catches up the next time it connects. Share the secret once to
+          pair a branch — after that, devices authenticate each other by cryptographic key.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -766,9 +767,7 @@ function SyncCard() {
                       status.listening ? 'bg-green-500' : 'bg-gray-300'
                     }`}
                   />
-                  {status.listening
-                    ? `listening on ${status.bind_addr}:${status.port}`
-                    : 'not listening'}
+                  {status.listening ? 'accepting sync connections' : 'not advertised'}
                 </span>
               )}
             </div>
@@ -779,27 +778,34 @@ function SyncCard() {
               />
               Accept sync connections from other devices
             </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="sync_port">Port</Label>
-                <Input
-                  id="sync_port"
-                  type="number"
-                  min="1"
-                  max="65535"
-                  value={form.port}
-                  onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))}
-                />
+            <div className="space-y-2">
+              <Label htmlFor="sync_addr">Address for peers</Label>
+              <div className="flex gap-2">
+                <Input id="sync_addr" value={syncAddress} readOnly className="font-mono" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(syncAddress);
+                      toast({ title: 'Address copied to clipboard' });
+                    } catch {
+                      toast({ variant: 'destructive', title: 'Could not copy to clipboard' });
+                    }
+                  }}
+                  disabled={!syncAddress}
+                  title="Copy address"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="sync_bind">Bind address</Label>
-                <Input
-                  id="sync_bind"
-                  value={form.bindAddr}
-                  onChange={(e) => setForm((f) => ({ ...f, bindAddr: e.target.value }))}
-                  placeholder="0.0.0.0"
-                />
-              </div>
+              <p className="text-xs text-gray-500">
+                Other branches add this exact address as a peer. Sync shares the app's own
+                port — there is no separate sync port. To be reachable across the LAN, run
+                FlowStock with host <span className="font-mono">0.0.0.0</span> (see
+                Configuration).
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="sync_secret">Shared secret</Label>
@@ -837,8 +843,9 @@ function SyncCard() {
                 </Button>
               </div>
               <p className="text-xs text-gray-500">
-                Set the exact same secret on every branch device. Listening is refused
-                without a secret.
+                Give a new branch this secret once, to pair it; from then on devices
+                authenticate by key and the secret is no longer the gate. Accepting sync
+                connections is refused without a secret set.
               </p>
             </div>
             <div className="space-y-2">
@@ -941,13 +948,20 @@ function SyncCard() {
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
                         {p.name}
+                        {!p.url && (
+                          <Badge variant="outline" className="ml-2" title="This device paired to us; we authenticate it but do not dial it.">
+                            inbound
+                          </Badge>
+                        )}
                         {!p.enabled && (
                           <Badge variant="secondary" className="ml-2">
                             disabled
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{p.url}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.url || (p.has_key ? 'key enrolled' : '—')}
+                      </TableCell>
                       <TableCell className="text-gray-500">{fmtWhen(p.last_sync_at)}</TableCell>
                       <TableCell className="max-w-56 truncate text-gray-500" title={p.last_status}>
                         {p.last_status || '—'}
@@ -957,8 +971,8 @@ function SyncCard() {
                           variant="ghost"
                           size="icon"
                           onClick={() => runSync(p.id)}
-                          disabled={syncing !== null || !p.enabled}
-                          title="Sync now"
+                          disabled={syncing !== null || !p.enabled || !p.url}
+                          title={p.url ? 'Sync now' : 'Inbound peer — nothing to dial'}
                         >
                           {syncing === p.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

@@ -48,13 +48,17 @@ func (s *Server) HandleJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = s.Store.SetSetting("sync_secret", body.Secret)
-	if err := s.Store.SavePeer(store.Peer{Name: "Workspace", URL: body.URL, Enabled: true}); err != nil {
+	// Save the peer with a known id and sync against THAT id, so the peer's
+	// identity (node id + key) and acknowledged vector learned during the join
+	// round are recorded on the row we just created, not a throwaway id.
+	peerID := store.NewID()
+	if err := s.Store.SavePeer(store.Peer{ID: peerID, Name: "Workspace", URL: body.URL, Enabled: true}); err != nil {
 		serverError(w, err)
 		return
 	}
 
 	// Pull the existing workspace. On a fresh node this adopts its org id.
-	res := s.Sync.SyncPeer(r.Context(), "join", body.URL)
+	res := s.Sync.SyncPeer(r.Context(), peerID, body.URL)
 	if !res.OK {
 		badRequest(w, fmt.Errorf("could not join: %s", res.Error))
 		return
