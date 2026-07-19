@@ -1,15 +1,13 @@
 <div align="center">
 
-<img src="src/assets/flowstock-logo.svg" alt="FlowStock" width="96" height="96">
-
-# FlowStock
+<img src="public/flowstock-wordmark.svg" alt="FlowStock" width="300">
 
 **Offline-first inventory for multi-branch businesses.**<br>
 Products, stock, orders, purchasing, and accounts — in one self-hosted binary
 that keeps every branch in sync, even when branches go offline.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0F6D7A.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-0F6D7A.svg)](CHANGELOG.md)
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 

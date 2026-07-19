@@ -359,7 +359,13 @@ const ProductManagement = () => {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6">
+      <div>
+        <h1 className="page-title">Products</h1>
+        <p className="page-subtitle">
+          Your catalog — products, their variations and SKUs.
+        </p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Products"
