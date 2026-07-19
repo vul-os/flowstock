@@ -89,13 +89,19 @@ func sigBase(method, path, bodyHash, ts, nonce string) []byte {
 	return []byte(method + "\n" + path + "\n" + bodyHash + "\n" + ts + "\n" + nonce)
 }
 
-// bearerOK reports whether the request presents the current shared secret.
+// bearerOK reports whether the request presents the current shared secret
+// with the required "Bearer " scheme — a bare `Authorization: <secret>` (no
+// scheme) does not authenticate, consistent with internal/auth.
 func (e *Engine) bearerOK(r *http.Request) bool {
 	secret := e.SecretFn()
 	if secret == "" {
 		return false
 	}
-	presented := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	hdr := r.Header.Get("Authorization")
+	presented, ok := strings.CutPrefix(hdr, "Bearer ")
+	if !ok {
+		return false
+	}
 	return subtle.ConstantTimeCompare([]byte(presented), []byte(secret)) == 1
 }
 

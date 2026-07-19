@@ -80,21 +80,19 @@ func TestAllDataEndpointsRequireAuth(t *testing.T) {
 	}
 }
 
-// LAXNESS, pinned deliberately: bearerOK trims the "Bearer " prefix with
-// TrimPrefix, which leaves a header that never had the prefix untouched — so a
-// bare `Authorization: <secret>` authenticates just as well as the documented
-// `Bearer <secret>`. This is not an escalation (the caller must still present
-// the whole secret) but it is laxer than the app-side gate in internal/auth,
-// which requires the scheme. Recorded so tightening it is a deliberate choice.
-func TestBearerSchemeIsNotEnforced(t *testing.T) {
+// bearerOK requires the "Bearer " scheme, consistent with the app-side gate in
+// internal/auth: a bare `Authorization: <secret>` (no scheme) must not
+// authenticate, only the documented `Bearer <secret>` form.
+func TestBearerSchemeIsEnforced(t *testing.T) {
 	a := newNode(t, "A", "s3cret")
 
 	if code, _ := req(t, "GET", a.server.URL+vectorPath, nil,
-		map[string]string{"Authorization": "s3cret"}); code != 200 {
-		t.Fatalf("expected the documented (lax) scheme-less acceptance, got %d", code)
+		map[string]string{"Authorization": "Bearer s3cret"}); code != 200 {
+		t.Fatalf("expected the documented Bearer-scheme acceptance, got %d", code)
 	}
-	// The secret itself is still required in full.
-	for _, wrong := range []string{"Bearer s3cre", "s3cre", "Bearer  s3cret", "bearer s3cret"} {
+	// A bare secret (no scheme) and every other malformed variant must not
+	// authenticate, even though the underlying secret is correct.
+	for _, wrong := range []string{"s3cret", "Bearer s3cre", "s3cre", "Bearer  s3cret", "bearer s3cret"} {
 		if code, _ := req(t, "GET", a.server.URL+vectorPath, nil,
 			map[string]string{"Authorization": wrong}); code != http.StatusUnauthorized {
 			t.Fatalf("%q must not authenticate, got %d", wrong, code)

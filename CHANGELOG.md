@@ -65,6 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **API contract change**: a caller that relied on omission clearing the
   secret must now send `"secret": ""` explicitly. The bundled UI always sent
   the field back anyway, so it is unaffected.
+- **Sync transport auth now requires the `Bearer ` scheme.** `bearerOK`
+  previously trimmed an optional `Bearer ` prefix, so a bare
+  `Authorization: <secret>` (no scheme) authenticated just as well as the
+  documented `Bearer <secret>` — laxer than `internal/auth`'s app-level gate,
+  which has always enforced the scheme. Not an escalation (the full secret was
+  still required either way), but tightened for consistency. Nothing in the
+  bundled client, the sync engine, or the E2E harness sent a bare header, so
+  this is a transport-only tightening with no call-site changes.
 
 ## [1.0.0] - 2026-07-19
 
