@@ -24,6 +24,7 @@ func (s *Server) syncSettings() map[string]any {
 		"listening": listen,
 		"node_id":   s.Store.NodeID(),
 		"org_id":    s.Store.OrgID(),
+		"pubkey":    s.Store.PublicKeyHex(),
 		"folder":    s.Store.GetSetting("sync_folder"),
 	}
 }

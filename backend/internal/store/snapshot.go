@@ -84,16 +84,27 @@ func (snap *Snapshot) Verify() bool {
 	return snap.Checksum != "" && snap.Checksum == snap.checksumBody()
 }
 
-// WriteSnapshot writes a verified snapshot to path atomically.
+// WriteSnapshot writes a verified, signed snapshot to path atomically. The
+// signature is Ed25519 over the checksum using this node's identity key.
 func (s *Store) WriteSnapshot(path string) (*Snapshot, error) {
 	snap, err := s.Snapshot()
 	if err != nil {
 		return nil, err
 	}
+	snap.PublicKey = s.PublicKeyHex()
+	snap.Signature = s.Sign([]byte(snap.Checksum))
 	if err := writeSnapshotFile(path, snap); err != nil {
 		return nil, err
 	}
 	return snap, nil
+}
+
+// VerifySignature reports whether the snapshot's signature matches its embedded
+// public key over its checksum. (The public key's binding to a trusted node is
+// established out of band via peers.pubkey; this only proves internal
+// consistency.)
+func (snap *Snapshot) VerifySignature() bool {
+	return snap.Verify() && VerifySig(snap.PublicKey, []byte(snap.Checksum), snap.Signature)
 }
 
 func writeSnapshotFile(path string, snap *Snapshot) error {

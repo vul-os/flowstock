@@ -7,6 +7,7 @@
 package store
 
 import (
+	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -39,6 +40,8 @@ type Store struct {
 	clock  *HLC
 	nodeID string
 	orgID  string
+	priv   ed25519.PrivateKey
+	pub    ed25519.PublicKey
 	// onChange fires after any committed local or remote mutation so the UI
 	// can refresh (wired to an SSE broadcaster in the api layer).
 	onChange func()
@@ -83,6 +86,12 @@ func Open(path string) (*Store, error) {
 		}
 	}
 	s.orgID = org
+
+	// Per-node Ed25519 identity (generated once), used to sign op batches and
+	// snapshots. Transport auth is unchanged (shared Bearer secret).
+	if err := s.ensureIdentity(); err != nil {
+		return nil, fmt.Errorf("node identity: %w", err)
+	}
 
 	// Seed the clock past everything already journalled.
 	var maxHLC sql.NullString
@@ -658,6 +667,13 @@ func (s *Store) SavePeerVector(id string, vec map[string]string) {
 // SavePeerPubkey records a peer's Ed25519 public key (hex), learned on pairing.
 func (s *Store) SavePeerPubkey(id, pubkeyHex string) {
 	_, _ = s.db.Exec("UPDATE peers SET pubkey = ? WHERE id = ?", pubkeyHex, id)
+}
+
+// PeerPubkey returns a peer's recorded public key (hex), or "".
+func (s *Store) PeerPubkey(id string) string {
+	var v string
+	_ = s.db.QueryRow("SELECT pubkey FROM peers WHERE id = ?", id).Scan(&v)
+	return v
 }
 
 // EnabledPeerVectors returns the saved version vector of every enabled peer.
