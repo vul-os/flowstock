@@ -1,22 +1,35 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { AuthProvider } from './context/auth-context';
+import React from 'react';
+import { HashRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
+import { WorkspaceProvider, useWorkspace } from '@/context/workspace-context';
+import SetupScreen from '@/pages/setup';
 
-const App = () => {
-
+const Gate = () => {
+  const { loading, initialized } = useWorkspace();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-muted-foreground">
+        Loading FlowStock…
+      </div>
+    );
+  }
+  if (!initialized) return <SetupScreen />;
   return (
-      <AuthProvider>
-        <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-          <Router>
-            <AppRoutes />
-          </Router>
-          <Toaster />
-        </ThemeProvider>
-      </AuthProvider>
+    <Router>
+      <AppRoutes />
+    </Router>
   );
 };
+
+const App = () => (
+  <WorkspaceProvider>
+    <ThemeProvider defaultTheme="light" storageKey="flowstock-theme">
+      <Gate />
+      <Toaster />
+    </ThemeProvider>
+  </WorkspaceProvider>
+);
 
 export default App;

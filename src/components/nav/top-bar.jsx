@@ -1,158 +1,85 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
-import { Menu, User, ChevronDown, Building2 } from 'lucide-react';
-import { AuthContext } from '@/context/use-auth';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Menu, Moon, Sun, RefreshCw, Building2, FlaskConical } from 'lucide-react';
 import Logo from '@/assets/flowstock-logo.svg';
-import LogoFallback from '@/assets/flowstock.png';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useTheme } from '@/components/theme-provider';
+import { useWorkspace } from '@/context/workspace-context';
+import { api } from '@/services/api';
+import { toast } from '@/components/ui/use-toast';
 
 const TopBar = ({ onMenuClick }) => {
-  const { user, signOut, organizations, activeOrganization, switchOrganization } = useContext(AuthContext);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
-  const userDropdownRef = useRef(null);
-  const orgDropdownRef = useRef(null);
+  const { theme, setTheme } = useTheme();
+  const { businessName, branchName, isDemo } = useWorkspace();
+  const [syncing, setSyncing] = useState(false);
 
-  // Toggle the dropdowns
-  const toggleUserDropdown = () => {
-    setUserDropdownOpen(!userDropdownOpen);
-    setOrgDropdownOpen(false);
-  };
-
-  const toggleOrgDropdown = () => {
-    setOrgDropdownOpen(!orgDropdownOpen);
-    setUserDropdownOpen(false);
-  };
-
-  // Handle clicking outside the dropdowns to close them
-  const handleClickOutside = (event) => {
-    if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
-      setUserDropdownOpen(false);
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const results = await api.syncNow();
+      if (results.length === 0) {
+        toast({ description: 'No sync peers configured — add branches under Settings.' });
+      } else {
+        const ok = results.filter((r) => r.ok).length;
+        const pulled = results.reduce((s, r) => s + (r.pulled || 0), 0);
+        const pushed = results.reduce((s, r) => s + (r.pushed || 0), 0);
+        toast({
+          description: `Synced ${ok}/${results.length} peers — pushed ${pushed}, pulled ${pulled} changes.`,
+          variant: ok === results.length ? 'default' : 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({ description: `Sync failed: ${e}`, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
     }
-    if (orgDropdownRef.current && !orgDropdownRef.current.contains(event.target)) {
-      setOrgDropdownOpen(false);
-    }
   };
 
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handleSignOut = () => {
-    signOut();
-    setUserDropdownOpen(false);
-  };
-
-  const handleOrgSwitch = (orgId) => {
-    switchOrganization(orgId);
-    setOrgDropdownOpen(false);
-  };
+  const isDark = theme === 'dark';
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white shadow-md h-16 flex justify-between items-center px-6 border-b border-gray-700">
-      <div className="flex items-center">
-        <button
-          className="mr-2 text-white hover:text-primary focus:outline-none md:hidden"
-          onClick={onMenuClick}
-          aria-label="Open navigation menu"
+    <header className="z-40 flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
+      <button
+        className="text-muted-foreground hover:text-foreground md:hidden"
+        onClick={onMenuClick}
+        aria-label="Open navigation menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+      <Link to="/" className="flex items-center gap-2">
+        <img src={Logo} alt="" className="h-7 w-7" />
+        <span className="text-base font-semibold tracking-tight">FlowStock</span>
+      </Link>
+      <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+        <span className="text-border">/</span>
+        <span>{businessName}</span>
+        <Badge variant="outline" className="gap-1 font-normal">
+          <Building2 className="h-3 w-3" />
+          {branchName}
+        </Badge>
+        {isDemo && (
+          <Badge variant="secondary" className="gap-1 font-normal">
+            <FlaskConical className="h-3 w-3" />
+            demo data
+          </Badge>
+        )}
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <Button variant="ghost" size="sm" onClick={handleSync} disabled={syncing} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Sync now</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle theme"
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
         >
-          <Menu size={24} />
-        </button>
-        
-        {/* Logo Section */}
-        <div className="flex items-center gap-2">
-          <a href="/" className="block">
-            <picture>
-              <source srcSet={Logo} type="image/svg+xml" />
-              <img
-                src={LogoFallback}
-                alt="flowstock Logo"
-                className="h-10 w-10 object-contain rounded-lg"
-              />
-            </picture>
-          </a>
-          <span className="hidden md:block text-blue font-bold text-3xl">
-            Flowstock
-          </span>
-        </div>
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
       </div>
-
-      <div className="flex items-center gap-4 relative">
-        {user && organizations?.length > 0 && (
-          <div className="relative">
-            <button
-              onClick={toggleOrgDropdown}
-              className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800 focus:outline-none"
-              aria-label="Organization menu"
-            >
-              <Building2 size={20} />
-              <span className="max-w-[150px] truncate">
-                {activeOrganization?.name || 'Select Organization'}
-              </span>
-              <ChevronDown size={16} />
-            </button>
-            {orgDropdownOpen && (
-              <div
-                ref={orgDropdownRef}
-                className="absolute mt-1 w-64 bg-white border border-gray-200 shadow-lg rounded-md z-10"
-                style={{ top: 'calc(100% + 8px)', right: '0' }}
-              >
-                {organizations.map((org) => (
-                  <button
-                    key={org.id}
-                    onClick={() => handleOrgSwitch(org.id)}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 ${
-                      activeOrganization?.id === org.id ? 'bg-gray-50 text-primary' : 'text-gray-800'
-                    }`}
-                  >
-                    <Building2 size={20} className="text-gray-400" />
-                    <span className="truncate">{org.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {user ? (
-          <>
-            <button
-              onClick={toggleUserDropdown}
-              className="flex items-center gap-2 focus:outline-none hover:text-primary"
-              aria-label="User menu"
-            >
-              <User size={24} className="text-white" />
-            </button>
-            {userDropdownOpen && (
-              <div
-                ref={userDropdownRef}
-                className="absolute mt-1 w-48 bg-white border border-gray-200 shadow-lg rounded-md z-10"
-                style={{ top: 'calc(100% + 16px)', right: '0' }}
-              >
-                <div className="px-4 py-2 text-gray-800 font-medium">
-                  {user.email}
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100"
-                >
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <RouterLink
-            to="/login"
-            className="flex items-center gap-2 hover:text-primary"
-          >
-            Login
-          </RouterLink>
-        )}
-      </div>
-    </nav>
+    </header>
   );
 };
 
