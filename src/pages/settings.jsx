@@ -4,6 +4,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Network,
   Pencil,
   Plus,
   RefreshCw,
@@ -37,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
@@ -813,24 +815,35 @@ function SyncCard() {
           </div>
         ) : (
           <form onSubmit={saveCfg} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">This device</h3>
-              {status && (
-                <span
-                  className={`inline-flex items-center gap-1.5 text-sm ${
-                    status.listening ? "text-success" : "text-muted-foreground"
-                  }`}
-                >
+            <div
+              className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${
+                status?.listening
+                  ? "border-success/30 bg-success-muted"
+                  : "border-border bg-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  {status?.listening && (
+                    <span className="absolute inline-flex h-full w-full animate-flow-pulse rounded-full bg-success" />
+                  )}
                   <span
-                    className={`h-2 w-2 rounded-full ${
-                      status.listening ? "bg-success" : "bg-muted"
+                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                      status?.listening
+                        ? "bg-success"
+                        : "bg-muted-foreground/40"
                     }`}
                   />
-                  {status.listening
-                    ? "accepting sync connections"
-                    : "not advertised"}
                 </span>
-              )}
+                <div>
+                  <p className="stencil-label">This device</p>
+                  <p className="text-sm font-medium">
+                    {status?.listening
+                      ? "Accepting sync connections"
+                      : "Not advertised to other branches"}
+                  </p>
+                </div>
+              </div>
             </div>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
@@ -978,7 +991,7 @@ function SyncCard() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Peers</h3>
+            <h3 className="stencil-label">Peers</h3>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -1015,9 +1028,11 @@ function SyncCard() {
             </div>
           </div>
           {peers.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              No peers yet. Add the other branch devices to start syncing.
-            </p>
+            <EmptyState
+              icon={Network}
+              title="No peers yet"
+              description="Add the other branch devices to start syncing. Share this device's address and secret once to pair them."
+            />
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -1053,14 +1068,24 @@ function SyncCard() {
                       <TableCell className="font-mono text-xs">
                         {p.url || (p.has_key ? "key enrolled" : "—")}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="font-mono text-xs text-muted-foreground">
                         {fmtWhen(p.last_sync_at)}
                       </TableCell>
-                      <TableCell
-                        className="max-w-56 truncate text-muted-foreground"
-                        title={p.last_status}
-                      >
-                        {p.last_status || "—"}
+                      <TableCell className="max-w-56" title={p.last_status}>
+                        {p.last_status ? (
+                          <Badge
+                            variant={
+                              /ok|success|synced/i.test(p.last_status)
+                                ? "success"
+                                : "danger"
+                            }
+                            className="max-w-full truncate"
+                          >
+                            {p.last_status}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -1181,7 +1206,7 @@ const SettingsPage = () => (
   <div className="mx-auto max-w-4xl space-y-6 p-6">
     <div>
       <h1 className="page-title">Settings</h1>
-      <p className="text-muted-foreground">
+      <p className="page-subtitle">
         Business details, branches and device sync.
       </p>
     </div>
