@@ -26,5 +26,12 @@ module.exports = {
       files: ['src/components/ui/**', 'src/components/theme-provider.jsx', 'src/context/**'],
       rules: { 'react-refresh/only-export-components': 'off' },
     },
+    {
+      // Playwright detects a fixture's dependencies by destructuring its first
+      // argument, so a fixture that needs none is written `async ({}, use)`.
+      // That is the framework's idiom, not an oversight.
+      files: ['e2e/**'],
+      rules: { 'no-empty-pattern': 'off' },
+    },
   ],
 };

@@ -6,3 +6,7 @@ src-tauri/gen
 backend/cmd/flowstock/dist
 /flowstock
 flowstock.config.json
+test-results
+playwright-report
+blob-report
+.playwright

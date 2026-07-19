@@ -13,6 +13,10 @@
         "preview": "vite preview",
         "dev:app": "go run ./backend/cmd/flowstock",
         "test:go": "go test ./backend/...",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "test:e2e:report": "playwright show-report",
+        "test": "npm run test:go && npm run test:e2e",
         "screenshots": "node scripts/screenshots.mjs",
         "demo-screenshots": "node scripts/screenshots.mjs"
     },
@@ -56,6 +60,7 @@
         "zod": "^3.23.8"
     },
     "devDependencies": {
+        "@playwright/test": "^1.61.1",
         "@tauri-apps/cli": "^2",
         "@types/node": "^20.8.7",
         "@types/react": "^18.2.15",
