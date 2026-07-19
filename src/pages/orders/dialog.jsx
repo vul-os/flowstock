@@ -1,23 +1,23 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { api } from '@/services/api';
-import { useWorkspace } from '@/context/workspace-context';
-import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { api } from "@/services/api";
+import { useWorkspace } from "@/context/workspace-context";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -25,14 +25,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import OrderItemsTabs from './items';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import OrderItemsTabs from "./items";
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => new Date().toISOString().split("T")[0];
 
 const OrderDialog = ({
   open,
@@ -49,15 +49,15 @@ const OrderDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Line items may only be changed while the order is a draft.
-  const locked = !!order && order.status !== 'draft';
+  const locked = !!order && order.status !== "draft";
 
   const form = useForm({
     defaultValues: {
-      customer_id: '',
+      customer_id: "",
       order_date: today(),
-      due_date: '',
-      payment_terms: '',
-      notes: '',
+      due_date: "",
+      payment_terms: "",
+      notes: "",
       order_items: [],
       order_services: [],
     },
@@ -67,34 +67,34 @@ const OrderDialog = ({
     if (!open) return;
     if (order) {
       form.reset({
-        customer_id: order.customer_id || '',
-        order_date: order.order_date?.split('T')[0] || today(),
-        due_date: order.due_date?.split('T')[0] || '',
-        payment_terms: order.payment_terms || '',
-        notes: order.notes || '',
+        customer_id: order.customer_id || "",
+        order_date: order.order_date?.split("T")[0] || today(),
+        due_date: order.due_date?.split("T")[0] || "",
+        payment_terms: order.payment_terms || "",
+        notes: order.notes || "",
         order_items: orderItems.map((i) => ({
           id: i.id,
-          product_variant_id: i.product_variant_id || '',
+          product_variant_id: i.product_variant_id || "",
           quantity: i.quantity || 0,
           unit_price: i.unit_price || 0,
           total_price: i.total_price || 0,
         })),
         order_services: orderServices.map((s) => ({
           id: s.id,
-          service_id: s.service_id || '',
+          service_id: s.service_id || "",
           hours: s.hours || 0,
           hourly_rate: s.hourly_rate || 0,
           total_price: s.total_price || 0,
-          description: s.description || '',
+          description: s.description || "",
         })),
       });
     } else {
       form.reset({
-        customer_id: '',
+        customer_id: "",
         order_date: today(),
-        due_date: '',
-        payment_terms: '',
-        notes: '',
+        due_date: "",
+        payment_terms: "",
+        notes: "",
         order_items: [],
         order_services: [],
       });
@@ -102,16 +102,22 @@ const OrderDialog = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order]);
 
-  const watchedItems = form.watch('order_items') || [];
-  const watchedServices = form.watch('order_services') || [];
-  const itemsTotal = watchedItems.reduce((sum, item) => sum + (item.total_price || 0), 0);
-  const servicesTotal = watchedServices.reduce((sum, svc) => sum + (svc.total_price || 0), 0);
+  const watchedItems = form.watch("order_items") || [];
+  const watchedServices = form.watch("order_services") || [];
+  const itemsTotal = watchedItems.reduce(
+    (sum, item) => sum + (item.total_price || 0),
+    0,
+  );
+  const servicesTotal = watchedServices.reduce(
+    (sum, svc) => sum + (svc.total_price || 0),
+    0,
+  );
   const subtotal = itemsTotal + servicesTotal;
   const total = subtotal; // sales orders carry no tax
 
   const handleSubmit = async (data) => {
     if (!data.customer_id) {
-      form.setError('customer_id', { message: 'Customer is required' });
+      form.setError("customer_id", { message: "Customer is required" });
       return;
     }
     try {
@@ -146,16 +152,19 @@ const OrderDialog = ({
             hours: s.hours || 0,
             hourly_rate: s.hourly_rate || 0,
             total_price: s.total_price || 0,
-            description: s.description || '',
+            description: s.description || "",
           }));
       }
       const saved = await api.saveOrder(payload);
-      toast({ title: order ? 'Order updated' : 'Order created', description: saved?.order_number });
+      toast({
+        title: order ? "Order updated" : "Order created",
+        description: saved?.order_number,
+      });
       onClose();
     } catch (error) {
       toast({
-        variant: 'destructive',
-        title: 'Could not save order',
+        variant: "destructive",
+        title: "Could not save order",
         description: String(error?.message || error),
       });
     } finally {
@@ -168,9 +177,13 @@ const OrderDialog = ({
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            {order ? `Order ${order.order_number || ''}` : 'Create Order'}
+            {order ? `Order ${order.order_number || ""}` : "Create Order"}
             {order && (
-              <Badge variant={order.status === 'cancelled' ? 'destructive' : 'secondary'}>
+              <Badge
+                variant={
+                  order.status === "cancelled" ? "destructive" : "secondary"
+                }
+              >
                 {order.status}
               </Badge>
             )}
@@ -178,14 +191,17 @@ const OrderDialog = ({
           <DialogDescription>
             {order
               ? locked
-                ? 'This order is no longer a draft — line items are locked. Use the status buttons on the list to move it along.'
-                : 'Update the order details below'
-              : 'Add a new order with products and services'}
+                ? "This order is no longer a draft — line items are locked. Use the status buttons on the list to move it along."
+                : "Update the order details below"
+              : "Add a new order with products and services"}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-6"
+          >
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -203,7 +219,9 @@ const OrderDialog = ({
                         {customers.map((customer) => (
                           <SelectItem key={customer.id} value={customer.id}>
                             {customer.name}
-                            {customer.company_name ? ` — ${customer.company_name}` : ''}
+                            {customer.company_name
+                              ? ` — ${customer.company_name}`
+                              : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -271,7 +289,10 @@ const OrderDialog = ({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Add any notes for this order..." />
+                    <Textarea
+                      {...field}
+                      placeholder="Add any notes for this order..."
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -280,7 +301,7 @@ const OrderDialog = ({
 
             <div className="flex items-center justify-between border-t pt-4">
               <div className="text-sm text-muted-foreground">
-                Order #{order?.order_number || 'New'}
+                Order #{order?.order_number || "New"}
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -294,7 +315,7 @@ const OrderDialog = ({
                   <div className="font-medium">Total: {fmtMoney(total)}</div>
                 </div>
                 <Button type="submit" disabled={isSubmitting}>
-                  {order ? 'Update Order' : 'Create Order'}
+                  {order ? "Update Order" : "Create Order"}
                 </Button>
               </div>
             </div>

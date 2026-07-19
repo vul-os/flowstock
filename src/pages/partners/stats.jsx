@@ -1,10 +1,10 @@
-import { Users, Building2 } from 'lucide-react';
+import { Users, Building2 } from "lucide-react";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 
 export const StatsCards = ({ customersCount, suppliersCount }) => {
   return (

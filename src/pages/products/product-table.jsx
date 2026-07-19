@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Pencil,
   Trash2,
@@ -10,9 +10,9 @@ import {
   SlidersHorizontal,
   ArrowLeftRight,
   AlertTriangle,
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -20,15 +20,21 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { branchBreakdown } from '@/lib/reports';
-import { parseAttributes, isLowStock } from './helpers';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { branchBreakdown } from "@/lib/reports";
+import { parseAttributes, isLowStock } from "./helpers";
 
 /** Stock total that pops open a per-branch breakdown. */
 const StockCell = ({ variant, total, levels, branchName }) => {
-  const rows = branchBreakdown(levels, variant.id).filter((l) => Number(l.qty) !== 0);
+  const rows = branchBreakdown(levels, variant.id).filter(
+    (l) => Number(l.qty) !== 0,
+  );
   const low = isLowStock(variant, total);
   return (
     <div className="flex items-center justify-end gap-2">
@@ -48,12 +54,16 @@ const StockCell = ({ variant, total, levels, branchName }) => {
         <PopoverContent className="w-56 p-3" align="end">
           <p className="mb-2 text-sm font-medium">Stock by branch</p>
           {rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No stock at any branch.</p>
+            <p className="text-sm text-muted-foreground">
+              No stock at any branch.
+            </p>
           ) : (
             <div className="space-y-1">
               {rows.map((l) => (
                 <div key={l.branch_id} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{branchName(l.branch_id)}</span>
+                  <span className="text-muted-foreground">
+                    {branchName(l.branch_id)}
+                  </span>
                   <span className="font-medium">{l.qty}</span>
                 </div>
               ))}
@@ -138,15 +148,21 @@ const ProductTable = ({
                 <Badge variant="outline" className="ml-2">
                   {product.variants.length} variations
                 </Badge>
-                {product.variants.some((v) => isLowStock(v, stockTotals.get(v.id) || 0)) && (
+                {product.variants.some((v) =>
+                  isLowStock(v, stockTotals.get(v.id) || 0),
+                ) && (
                   <Badge variant="destructive" className="ml-2">
                     Low stock
                   </Badge>
                 )}
               </TableCell>
-              <TableCell className="max-w-md truncate">{product.description}</TableCell>
+              <TableCell className="max-w-md truncate">
+                {product.description}
+              </TableCell>
               <TableCell>
-                {product.categoryName && <Badge variant="secondary">{product.categoryName}</Badge>}
+                {product.categoryName && (
+                  <Badge variant="secondary">{product.categoryName}</Badge>
+                )}
               </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-2">
@@ -174,7 +190,11 @@ const ProductTable = ({
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => onAddVariation(product)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onAddVariation(product)}
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Variation
                   </Button>
@@ -206,19 +226,25 @@ const ProductTable = ({
                                     )}
                                   </div>
                                   <div className="mt-1 text-sm text-muted-foreground">
-                                    {Object.entries(parseAttributes(variant.attributes)).map(
-                                      ([key, value]) => (
-                                        <Badge key={key} variant="secondary" className="mr-2">
-                                          {key}: {String(value)}
-                                        </Badge>
-                                      ),
-                                    )}
+                                    {Object.entries(
+                                      parseAttributes(variant.attributes),
+                                    ).map(([key, value]) => (
+                                      <Badge
+                                        key={key}
+                                        variant="secondary"
+                                        className="mr-2"
+                                      >
+                                        {key}: {String(value)}
+                                      </Badge>
+                                    ))}
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-right">
-                                  <div className="font-medium">{fmtMoney(variant.price)}</div>
+                                  <div className="font-medium">
+                                    {fmtMoney(variant.price)}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">
                                     Cost: {fmtMoney(variant.cost_price)}
                                   </div>
@@ -250,7 +276,9 @@ const ProductTable = ({
                                     variant="ghost"
                                     size="icon"
                                     title="Edit variation"
-                                    onClick={() => onEditVariation(product, variant)}
+                                    onClick={() =>
+                                      onEditVariation(product, variant)
+                                    }
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,55 +6,63 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { api } from '@/services/api';
-import { useWorkspace } from '@/context/workspace-context';
-import { toast } from '@/components/ui/use-toast';
+} from "@/components/ui/select";
+import { api } from "@/services/api";
+import { useWorkspace } from "@/context/workspace-context";
+import { toast } from "@/components/ui/use-toast";
 
 const qtyAt = (levels, variantId, branchId) =>
   Number(
-    levels.find((l) => l.variant_id === variantId && l.branch_id === branchId)?.qty || 0,
+    levels.find((l) => l.variant_id === variantId && l.branch_id === branchId)
+      ?.qty || 0,
   );
 
 const variantLabel = (variant) =>
-  variant ? `${variant.name}${variant.sku ? ` (${variant.sku})` : ''}` : '';
+  variant ? `${variant.name}${variant.sku ? ` (${variant.sku})` : ""}` : "";
 
 /**
  * Manual stock adjustment for one variant: pick a branch, then either enter
  * a +/- delta (kind "adjustment") or a counted total (kind "count", delta
  * computed against the current level).
  */
-export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, levels }) => {
+export const AdjustStockDialog = ({
+  open,
+  onOpenChange,
+  variant,
+  branches,
+  levels,
+}) => {
   const { branchId: homeBranchId } = useWorkspace();
-  const [branchId, setBranchId] = useState('');
-  const [mode, setMode] = useState('adjustment');
-  const [qty, setQty] = useState('');
-  const [note, setNote] = useState('');
+  const [branchId, setBranchId] = useState("");
+  const [mode, setMode] = useState("adjustment");
+  const [qty, setQty] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setBranchId(homeBranchId || branches[0]?.id || '');
-      setMode('adjustment');
-      setQty('');
-      setNote('');
+      setBranchId(homeBranchId || branches[0]?.id || "");
+      setMode("adjustment");
+      setQty("");
+      setNote("");
     }
   }, [open, homeBranchId, branches]);
 
   const current = variant && branchId ? qtyAt(levels, variant.id, branchId) : 0;
   const qtyNum = Number(qty);
-  const delta = mode === 'count' ? qtyNum - current : qtyNum;
-  const canSave = branchId && qty !== '' && Number.isFinite(qtyNum) && delta !== 0;
+  const delta = mode === "count" ? qtyNum - current : qtyNum;
+  const canSave =
+    branchId && qty !== "" && Number.isFinite(qtyNum) && delta !== 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,15 +77,15 @@ export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, level
         note,
       });
       toast({
-        title: 'Stock updated',
-        description: `${variantLabel(variant)}: ${delta > 0 ? '+' : ''}${delta} recorded.`,
+        title: "Stock updated",
+        description: `${variantLabel(variant)}: ${delta > 0 ? "+" : ""}${delta} recorded.`,
       });
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: 'Adjustment failed',
+        title: "Adjustment failed",
         description: String(err?.message || err),
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setSaving(false);
@@ -109,7 +117,8 @@ export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, level
               </Select>
               {branchId && (
                 <p className="text-sm text-muted-foreground">
-                  Current level at this branch: <span className="font-medium">{current}</span>
+                  Current level at this branch:{" "}
+                  <span className="font-medium">{current}</span>
                 </p>
               )}
             </div>
@@ -120,28 +129,32 @@ export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, level
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="adjustment">Adjustment (+/- change)</SelectItem>
-                  <SelectItem value="count">Stock count (set new total)</SelectItem>
+                  <SelectItem value="adjustment">
+                    Adjustment (+/- change)
+                  </SelectItem>
+                  <SelectItem value="count">
+                    Stock count (set new total)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="adjust-qty">
-                {mode === 'count' ? 'Counted quantity' : 'Quantity change'}
+                {mode === "count" ? "Counted quantity" : "Quantity change"}
               </Label>
               <Input
                 id="adjust-qty"
                 type="number"
                 step="1"
-                min={mode === 'count' ? 0 : undefined}
+                min={mode === "count" ? 0 : undefined}
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
-                placeholder={mode === 'count' ? 'e.g. 42' : 'e.g. -3 or 10'}
+                placeholder={mode === "count" ? "e.g. 42" : "e.g. -3 or 10"}
                 required
               />
-              {mode === 'count' && qty !== '' && Number.isFinite(qtyNum) && (
+              {mode === "count" && qty !== "" && Number.isFinite(qtyNum) && (
                 <p className="text-sm text-muted-foreground">
-                  Computed change: {delta > 0 ? '+' : ''}
+                  Computed change: {delta > 0 ? "+" : ""}
                   {delta}
                 </p>
               )}
@@ -157,11 +170,15 @@ export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, level
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : 'Record'}
+              {saving ? "Saving…" : "Record"}
             </Button>
           </DialogFooter>
         </form>
@@ -171,30 +188,41 @@ export const AdjustStockDialog = ({ open, onOpenChange, variant, branches, level
 };
 
 /** Move stock of one variant between two branches. */
-export const TransferStockDialog = ({ open, onOpenChange, variant, branches, levels }) => {
+export const TransferStockDialog = ({
+  open,
+  onOpenChange,
+  variant,
+  branches,
+  levels,
+}) => {
   const { branchId: homeBranchId } = useWorkspace();
-  const [fromBranchId, setFromBranchId] = useState('');
-  const [toBranchId, setToBranchId] = useState('');
-  const [qty, setQty] = useState('');
-  const [note, setNote] = useState('');
+  const [fromBranchId, setFromBranchId] = useState("");
+  const [toBranchId, setToBranchId] = useState("");
+  const [qty, setQty] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setFromBranchId(homeBranchId || branches[0]?.id || '');
-      setToBranchId('');
-      setQty('');
-      setNote('');
+      setFromBranchId(homeBranchId || branches[0]?.id || "");
+      setToBranchId("");
+      setQty("");
+      setNote("");
     }
   }, [open, homeBranchId, branches]);
 
   const available = useMemo(
-    () => (variant && fromBranchId ? qtyAt(levels, variant.id, fromBranchId) : 0),
+    () =>
+      variant && fromBranchId ? qtyAt(levels, variant.id, fromBranchId) : 0,
     [levels, variant, fromBranchId],
   );
   const qtyNum = Number(qty);
   const canSave =
-    fromBranchId && toBranchId && fromBranchId !== toBranchId && Number.isFinite(qtyNum) && qtyNum > 0;
+    fromBranchId &&
+    toBranchId &&
+    fromBranchId !== toBranchId &&
+    Number.isFinite(qtyNum) &&
+    qtyNum > 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -208,18 +236,20 @@ export const TransferStockDialog = ({ open, onOpenChange, variant, branches, lev
         qty: qtyNum,
         note,
       });
-      const fromName = branches.find((b) => b.id === fromBranchId)?.name || 'branch';
-      const toName = branches.find((b) => b.id === toBranchId)?.name || 'branch';
+      const fromName =
+        branches.find((b) => b.id === fromBranchId)?.name || "branch";
+      const toName =
+        branches.find((b) => b.id === toBranchId)?.name || "branch";
       toast({
-        title: 'Transfer recorded',
+        title: "Transfer recorded",
         description: `${qtyNum} × ${variantLabel(variant)}: ${fromName} → ${toName}.`,
       });
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: 'Transfer failed',
+        title: "Transfer failed",
         description: String(err?.message || err),
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setSaving(false);
@@ -251,7 +281,8 @@ export const TransferStockDialog = ({ open, onOpenChange, variant, branches, lev
               </Select>
               {fromBranchId && (
                 <p className="text-sm text-muted-foreground">
-                  Available here: <span className="font-medium">{available}</span>
+                  Available here:{" "}
+                  <span className="font-medium">{available}</span>
                 </p>
               )}
             </div>
@@ -295,11 +326,15 @@ export const TransferStockDialog = ({ open, onOpenChange, variant, branches, lev
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Transferring…' : 'Transfer'}
+              {saving ? "Transferring…" : "Transfer"}
             </Button>
           </DialogFooter>
         </form>

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -9,19 +9,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, ArrowUpDown, Download, FileBarChart } from 'lucide-react';
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/use-toast";
+import { ArrowLeft, ArrowUpDown, Download, FileBarChart } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -30,8 +30,12 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from 'recharts';
-import { useWorkspace, useTables, useStockLevels } from '@/context/workspace-context';
+} from "recharts";
+import {
+  useWorkspace,
+  useTables,
+  useStockLevels,
+} from "@/context/workspace-context";
 import {
   inventoryValuation,
   lowStock,
@@ -39,34 +43,34 @@ import {
   partyBalances,
   movementLedger,
   MOVEMENT_KIND_LABELS,
-} from '@/lib/reports';
-import { REPORTS } from './reports-config';
+} from "@/lib/reports";
+import { REPORTS } from "./reports-config";
 
-const GRID = '#e1e0d9';
-const AXIS_INK = '#898781';
+const GRID = "#e1e0d9";
+const AXIS_INK = "#898781";
 
 const KIND_BADGE = {
-  receive: 'bg-green-100 text-green-800',
-  transfer_in: 'bg-green-100 text-green-800',
-  sale: 'bg-red-100 text-red-800',
-  transfer_out: 'bg-red-100 text-red-800',
-  adjustment: 'bg-amber-100 text-amber-800',
-  count: 'bg-amber-100 text-amber-800',
-  reversal: 'bg-amber-100 text-amber-800',
+  receive: "bg-success-muted text-success",
+  transfer_in: "bg-success-muted text-success",
+  sale: "bg-destructive-muted text-destructive",
+  transfer_out: "bg-destructive-muted text-destructive",
+  adjustment: "bg-signal-muted text-signal-text",
+  count: "bg-signal-muted text-signal-text",
+  reversal: "bg-signal-muted text-signal-text",
 };
 
 const money2 = (n) => Number(n || 0).toFixed(2);
 
 const fmtDateTime = (iso) => {
-  if (!iso) return '';
+  if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return d.toLocaleString("en-ZA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -74,7 +78,7 @@ const monthLabel = (key) => {
   const d = new Date(`${key}-01T00:00:00`);
   return Number.isNaN(d.getTime())
     ? key
-    : d.toLocaleString('en-ZA', { month: 'short', year: 'numeric' });
+    : d.toLocaleString("en-ZA", { month: "short", year: "numeric" });
 };
 
 /** Build a CSV from headers + rows-of-arrays and trigger a client-side download. */
@@ -83,13 +87,15 @@ function makeCsvExporter(toast, filename, buildRows) {
     try {
       const { headers, rows } = buildRows();
       const esc = (v) => {
-        const s = String(v ?? '');
+        const s = String(v ?? "");
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
-      const csv = [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n');
-      const blob = new Blob([` ${csv}`], { type: 'text/csv;charset=utf-8;' });
+      const csv = [headers, ...rows]
+        .map((r) => r.map(esc).join(","))
+        .join("\n");
+      const blob = new Blob([` ${csv}`], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
@@ -98,9 +104,9 @@ function makeCsvExporter(toast, filename, buildRows) {
       URL.revokeObjectURL(url);
     } catch (e) {
       toast({
-        title: 'Export failed',
-        description: e?.message || 'Could not build the CSV file.',
-        variant: 'destructive',
+        title: "Export failed",
+        description: e?.message || "Could not build the CSV file.",
+        variant: "destructive",
       });
     }
   };
@@ -108,9 +114,9 @@ function makeCsvExporter(toast, filename, buildRows) {
 
 const EmptyState = ({ title, hint }) => (
   <div className="flex flex-col items-center justify-center py-12 text-center">
-    <FileBarChart className="h-8 w-8 text-gray-300 mb-3" />
-    <p className="text-sm font-medium text-gray-600">{title}</p>
-    {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+    <FileBarChart className="h-8 w-8 text-muted-foreground mb-3" />
+    <p className="text-sm font-medium text-muted-foreground">{title}</p>
+    {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
   </div>
 );
 
@@ -119,15 +125,17 @@ const ReportShell = ({ title, description, onExport, children }) => (
     <div>
       <Link
         to="/reports"
-        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3"
+        className="inline-flex items-center gap-1 text-sm text-primary hover:text-blue-800 mb-3"
       >
         <ArrowLeft className="h-4 w-4" />
         All reports
       </Link>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-          {description && <p className="text-gray-500 mt-1">{description}</p>}
+          <h1 className="page-title">{title}</h1>
+          {description && (
+            <p className="text-muted-foreground mt-1">{description}</p>
+          )}
         </div>
         {onExport && (
           <Button variant="outline" onClick={onExport} className="shrink-0">
@@ -151,27 +159,41 @@ const VALUATION_SORTS = {
 };
 
 function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
-  const [sort, setSort] = useState({ key: 'cost_value', dir: 'desc' });
+  const [sort, setSort] = useState({ key: "cost_value", dir: "desc" });
 
   const valuation = useMemo(
-    () => inventoryValuation(data.products || [], data.product_variants || [], levels),
+    () =>
+      inventoryValuation(
+        data.products || [],
+        data.product_variants || [],
+        levels,
+      ),
     [data, levels],
   );
 
   const lines = useMemo(() => {
     const sorted = [...valuation.lines].sort(VALUATION_SORTS[sort.key]);
-    return sort.dir === 'desc' ? sorted.reverse() : sorted;
+    return sort.dir === "desc" ? sorted.reverse() : sorted;
   }, [valuation, sort]);
 
   const toggleSort = (key) =>
     setSort((s) =>
       s.key === key
-        ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
-        : { key, dir: key === 'product' ? 'asc' : 'desc' },
+        ? { key, dir: s.dir === "desc" ? "asc" : "desc" }
+        : { key, dir: key === "product" ? "asc" : "desc" },
     );
 
-  const onExport = makeCsvExporter(toast, 'inventory-valuation.csv', () => ({
-    headers: ['Product', 'Variant', 'SKU', 'Qty', 'Unit cost', 'Unit price', 'Cost value', 'Retail value'],
+  const onExport = makeCsvExporter(toast, "inventory-valuation.csv", () => ({
+    headers: [
+      "Product",
+      "Variant",
+      "SKU",
+      "Qty",
+      "Unit cost",
+      "Unit price",
+      "Cost value",
+      "Retail value",
+    ],
     rows: lines.map((l) => [
       l.product,
       l.variant,
@@ -190,7 +212,7 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
         type="button"
         onClick={() => toggleSort(id)}
         className={`inline-flex items-center gap-1 hover:text-foreground ${
-          sort.key === id ? 'text-foreground font-semibold' : ''
+          sort.key === id ? "text-foreground font-semibold" : ""
         }`}
       >
         {children}
@@ -208,7 +230,10 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
       <Card>
         <CardContent className="pt-6">
           {valuation.lines.length === 0 ? (
-            <EmptyState title="No products yet" hint="Add products and stock to see a valuation." />
+            <EmptyState
+              title="No products yet"
+              hint="Add products and stock to see a valuation."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -216,11 +241,17 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
                   <SortHead id="product">Product</SortHead>
                   <TableHead>Variant</TableHead>
                   <TableHead>SKU</TableHead>
-                  <SortHead id="qty" className="text-right">Qty</SortHead>
+                  <SortHead id="qty" className="text-right">
+                    Qty
+                  </SortHead>
                   <TableHead className="text-right">Unit cost</TableHead>
                   <TableHead className="text-right">Unit price</TableHead>
-                  <SortHead id="cost_value" className="text-right">Cost value</SortHead>
-                  <SortHead id="retail_value" className="text-right">Retail value</SortHead>
+                  <SortHead id="cost_value" className="text-right">
+                    Cost value
+                  </SortHead>
+                  <SortHead id="retail_value" className="text-right">
+                    Retail value
+                  </SortHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,12 +259,22 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
                   <TableRow key={l.variant_id}>
                     <TableCell className="font-medium">{l.product}</TableCell>
                     <TableCell>{l.variant}</TableCell>
-                    <TableCell className="text-gray-500">{l.sku}</TableCell>
-                    <TableCell className="text-right tabular-nums">{l.qty}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(l.cost_price)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(l.price)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(l.cost_value)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(l.retail_value)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.sku}
+                    </TableCell>
+                    <TableCell className="cell-num">{l.qty}</TableCell>
+                    <TableCell className="cell-num">
+                      {fmtMoney(l.cost_price)}
+                    </TableCell>
+                    <TableCell className="cell-num">
+                      {fmtMoney(l.price)}
+                    </TableCell>
+                    <TableCell className="cell-num">
+                      {fmtMoney(l.cost_value)}
+                    </TableCell>
+                    <TableCell className="cell-num">
+                      {fmtMoney(l.retail_value)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -242,10 +283,10 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
                   <TableCell colSpan={6} className="font-semibold">
                     Total
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
+                  <TableCell className="cell-num font-semibold">
                     {fmtMoney(valuation.total_cost)}
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
+                  <TableCell className="cell-num font-semibold">
                     {fmtMoney(valuation.total_retail)}
                   </TableCell>
                 </TableRow>
@@ -263,9 +304,9 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
 const MOVEMENTS_SHOWN = 300;
 
 function StockMovementsReport({ data, toast }) {
-  const [branch, setBranch] = useState('all');
-  const [kind, setKind] = useState('all');
-  const [search, setSearch] = useState('');
+  const [branch, setBranch] = useState("all");
+  const [kind, setKind] = useState("all");
+  const [search, setSearch] = useState("");
 
   const branches = useMemo(() => data.branches || [], [data.branches]);
 
@@ -283,16 +324,26 @@ function StockMovementsReport({ data, toast }) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ledger.filter((m) => {
-      if (branch !== 'all' && m.branch_id !== branch) return false;
-      if (kind !== 'all' && m.kind !== kind) return false;
+      if (branch !== "all" && m.branch_id !== branch) return false;
+      if (kind !== "all" && m.kind !== kind) return false;
       if (!q) return true;
-      return [m.product, m.variant, m.sku, m.note, m.branch]
-        .some((f) => (f || '').toLowerCase().includes(q));
+      return [m.product, m.variant, m.sku, m.note, m.branch].some((f) =>
+        (f || "").toLowerCase().includes(q),
+      );
     });
   }, [ledger, branch, kind, search]);
 
-  const onExport = makeCsvExporter(toast, 'stock-movements.csv', () => ({
-    headers: ['Date', 'Product', 'Variant', 'SKU', 'Branch', 'Kind', 'Qty change', 'Note'],
+  const onExport = makeCsvExporter(toast, "stock-movements.csv", () => ({
+    headers: [
+      "Date",
+      "Product",
+      "Variant",
+      "SKU",
+      "Branch",
+      "Kind",
+      "Qty change",
+      "Note",
+    ],
     rows: filtered.map((m) => [
       m.created_at,
       m.product,
@@ -370,19 +421,21 @@ function StockMovementsReport({ data, toast }) {
                 <TableBody>
                   {filtered.slice(0, MOVEMENTS_SHOWN).map((m) => (
                     <TableRow key={m.id}>
-                      <TableCell className="whitespace-nowrap text-gray-500">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {fmtDateTime(m.created_at)}
                       </TableCell>
                       <TableCell className="font-medium">
                         {m.product}
-                        {m.variant ? ` — ${m.variant}` : ''}
+                        {m.variant ? ` — ${m.variant}` : ""}
                       </TableCell>
-                      <TableCell className="text-gray-500">{m.sku}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {m.sku}
+                      </TableCell>
                       <TableCell>{m.branch}</TableCell>
                       <TableCell>
                         <span
                           className={`px-2 py-0.5 text-xs rounded-full font-medium whitespace-nowrap ${
-                            KIND_BADGE[m.kind] || 'bg-gray-200 text-gray-700'
+                            KIND_BADGE[m.kind] || "bg-muted text-foreground"
                           }`}
                         >
                           {MOVEMENT_KIND_LABELS[m.kind] || m.kind}
@@ -390,21 +443,25 @@ function StockMovementsReport({ data, toast }) {
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-semibold ${
-                          Number(m.qty_delta) >= 0 ? 'text-green-700' : 'text-red-600'
+                          Number(m.qty_delta) >= 0
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       >
-                        {Number(m.qty_delta) >= 0 ? '+' : ''}
+                        {Number(m.qty_delta) >= 0 ? "+" : ""}
                         {m.qty_delta}
                       </TableCell>
-                      <TableCell className="text-gray-500 max-w-[16rem] truncate">{m.note}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-[16rem] truncate">
+                        {m.note}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {filtered.length > MOVEMENTS_SHOWN
                   ? `Showing first ${MOVEMENTS_SHOWN} of ${filtered.length} movements — narrow the filters or export the full set.`
-                  : `${filtered.length} movement${filtered.length === 1 ? '' : 's'}.`}
+                  : `${filtered.length} movement${filtered.length === 1 ? "" : "s"}.`}
               </p>
             </>
           )}
@@ -431,8 +488,11 @@ function LowStockReport({ data, levels, toast }) {
     // Supplier hint: the supplier on the PO behind the latest goods receipt.
     const lastSupplier = new Map();
     [...movements]
-      .filter((m) => m.kind === 'receive' && m.ref_kind === 'purchase_order' && m.ref_id)
-      .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
+      .filter(
+        (m) =>
+          m.kind === "receive" && m.ref_kind === "purchase_order" && m.ref_id,
+      )
+      .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""))
       .forEach((m) => {
         const po = poById.get(m.ref_id);
         const sup = po && supplierById.get(po.supplier_id);
@@ -441,14 +501,22 @@ function LowStockReport({ data, levels, toast }) {
 
     return lowStock(variants, levels).map((v) => ({
       ...v,
-      product: productName.get(v.product_id) || '—',
+      product: productName.get(v.product_id) || "—",
       shortfall: Number(v.reorder_point || 0) - v.qty,
-      supplier: lastSupplier.get(v.id) || '',
+      supplier: lastSupplier.get(v.id) || "",
     }));
   }, [data, levels]);
 
-  const onExport = makeCsvExporter(toast, 'low-stock.csv', () => ({
-    headers: ['Product', 'Variant', 'SKU', 'Qty on hand', 'Reorder point', 'Shortfall', 'Last supplier'],
+  const onExport = makeCsvExporter(toast, "low-stock.csv", () => ({
+    headers: [
+      "Product",
+      "Variant",
+      "SKU",
+      "Qty on hand",
+      "Reorder point",
+      "Shortfall",
+      "Last supplier",
+    ],
     rows: rows.map((r) => [
       r.product,
       r.name,
@@ -490,28 +558,37 @@ function LowStockReport({ data, levels, toast }) {
                 {rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">
-                      <Link to={`/products/${r.product_id}`} className="hover:underline">
+                      <Link
+                        to={`/products/${r.product_id}`}
+                        className="hover:underline"
+                      >
                         {r.product}
                       </Link>
                     </TableCell>
                     <TableCell>{r.name}</TableCell>
-                    <TableCell className="text-gray-500">{r.sku}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-muted-foreground">
+                      {r.sku}
+                    </TableCell>
+                    <TableCell className="cell-num">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                           r.qty <= Number(r.reorder_point || 0) / 2
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            ? "bg-destructive-muted text-destructive"
+                            : "bg-signal-muted text-signal-text"
                         }`}
                       >
                         {r.qty}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.reorder_point}</TableCell>
-                    <TableCell className="text-right tabular-nums font-semibold text-red-600">
+                    <TableCell className="cell-num">
+                      {r.reorder_point}
+                    </TableCell>
+                    <TableCell className="cell-num font-semibold text-destructive">
                       {r.shortfall}
                     </TableCell>
-                    <TableCell className="text-gray-500">{r.supplier || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.supplier || "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -533,10 +610,15 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
     const products = data.products || [];
     const customers = data.customers || [];
 
-    const months = salesByMonth(orders, 12).map((m) => ({ ...m, label: monthLabel(m.month) }));
+    const months = salesByMonth(orders, 12).map((m) => ({
+      ...m,
+      label: monthLabel(m.month),
+    }));
 
     const okOrders = new Set(
-      orders.filter((o) => ['confirmed', 'paid'].includes(o.status)).map((o) => o.id),
+      orders
+        .filter((o) => ["confirmed", "paid"].includes(o.status))
+        .map((o) => o.id),
     );
     const variantById = new Map(variants.map((v) => [v.id, v]));
     const productName = new Map(products.map((p) => [p.id, p.name]));
@@ -555,8 +637,8 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
         const v = variantById.get(vid);
         return {
           id: vid,
-          name: v ? `${productName.get(v.product_id) || '—'} — ${v.name}` : vid,
-          sku: v?.sku || '',
+          name: v ? `${productName.get(v.product_id) || "—"} — ${v.name}` : vid,
+          sku: v?.sku || "",
           qty: e.qty,
           revenue: e.revenue,
         };
@@ -566,7 +648,7 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
 
     const byCustomer = new Map();
     orders
-      .filter((o) => ['confirmed', 'paid'].includes(o.status))
+      .filter((o) => ["confirmed", "paid"].includes(o.status))
       .forEach((o) => {
         const e = byCustomer.get(o.customer_id) || { orders: 0, revenue: 0 };
         e.orders += 1;
@@ -578,8 +660,8 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
       .map(([cid, e]) => {
         const c = customerById.get(cid);
         return {
-          id: cid || 'unknown',
-          name: c ? c.company_name || c.name : 'Unknown customer',
+          id: cid || "unknown",
+          name: c ? c.company_name || c.name : "Unknown customer",
           orders: e.orders,
           revenue: e.revenue,
         };
@@ -591,10 +673,10 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
   }, [data]);
 
   const hasSales = monthly.some((m) => m.total > 0);
-  const symbol = currency?.symbol ?? 'R';
+  const symbol = currency?.symbol ?? "R";
 
-  const onExport = makeCsvExporter(toast, 'sales.csv', () => ({
-    headers: ['Month', 'Orders', 'Sales'],
+  const onExport = makeCsvExporter(toast, "sales.csv", () => ({
+    headers: ["Month", "Orders", "Sales"],
     rows: monthly.map((m) => [m.month, m.count, money2(m.total)]),
   }));
 
@@ -610,13 +692,23 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
         </CardHeader>
         <CardContent>
           {!hasSales ? (
-            <EmptyState title="No sales yet" hint="Confirm or complete an order to see it here." />
+            <EmptyState
+              title="No sales yet"
+              hint="Confirm or complete an order to see it here."
+            />
           ) : (
             <>
               <div className="h-72 mb-6">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthly} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                  <BarChart
+                    data={monthly}
+                    margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={GRID}
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="label"
                       tick={{ fill: AXIS_INK, fontSize: 11 }}
@@ -632,14 +724,21 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v) =>
-                        v >= 1000 ? `${symbol}${(v / 1000).toLocaleString('en-ZA')}k` : `${symbol}${v}`
+                        v >= 1000
+                          ? `${symbol}${(v / 1000).toLocaleString("en-ZA")}k`
+                          : `${symbol}${v}`
                       }
                     />
                     <Tooltip
-                      cursor={{ fill: 'rgba(11,11,11,0.04)' }}
-                      formatter={(value) => [fmtMoney(value), 'Sales']}
+                      cursor={{ fill: "rgba(11,11,11,0.04)" }}
+                      formatter={(value) => [fmtMoney(value), "Sales"]}
                     />
-                    <Bar dataKey="total" fill="#2a78d6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar
+                      dataKey="total"
+                      fill="#2a78d6"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -655,18 +754,20 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                   {monthly.map((m) => (
                     <TableRow key={m.month}>
                       <TableCell className="font-medium">{m.label}</TableCell>
-                      <TableCell className="text-right tabular-nums">{m.count}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtMoney(m.total)}</TableCell>
+                      <TableCell className="cell-num">{m.count}</TableCell>
+                      <TableCell className="cell-num">
+                        {fmtMoney(m.total)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-semibold">Total</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
+                    <TableCell className="cell-num font-semibold">
                       {monthly.reduce((s, m) => s + m.count, 0)}
                     </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
+                    <TableCell className="cell-num font-semibold">
                       {fmtMoney(monthly.reduce((s, m) => s + m.total, 0))}
                     </TableCell>
                   </TableRow>
@@ -699,10 +800,16 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                     <TableRow key={p.id}>
                       <TableCell>
                         <span className="font-medium">{p.name}</span>
-                        {p.sku && <span className="text-gray-400 text-xs ml-2">{p.sku}</span>}
+                        {p.sku && (
+                          <span className="text-muted-foreground text-xs ml-2">
+                            {p.sku}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{p.qty}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtMoney(p.revenue)}</TableCell>
+                      <TableCell className="cell-num">{p.qty}</TableCell>
+                      <TableCell className="cell-num">
+                        {fmtMoney(p.revenue)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -731,8 +838,10 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                   {topCustomers.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{c.orders}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtMoney(c.revenue)}</TableCell>
+                      <TableCell className="cell-num">{c.orders}</TableCell>
+                      <TableCell className="cell-num">
+                        {fmtMoney(c.revenue)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -762,14 +871,18 @@ function BalanceTable({ rows, partyLabel, fmtMoney, total, balanceClass }) {
         {rows.map((r) => (
           <TableRow key={r.party.id}>
             <TableCell>
-              <span className="font-medium">{r.party.company_name || r.party.name}</span>
+              <span className="font-medium">
+                {r.party.company_name || r.party.name}
+              </span>
               {r.party.company_name && r.party.name && (
-                <span className="text-gray-400 text-xs ml-2">{r.party.name}</span>
+                <span className="text-muted-foreground text-xs ml-2">
+                  {r.party.name}
+                </span>
               )}
             </TableCell>
-            <TableCell className="text-right tabular-nums">{fmtMoney(r.invoiced)}</TableCell>
-            <TableCell className="text-right tabular-nums">{fmtMoney(r.paid)}</TableCell>
-            <TableCell className={`text-right tabular-nums font-semibold ${balanceClass}`}>
+            <TableCell className="cell-num">{fmtMoney(r.invoiced)}</TableCell>
+            <TableCell className="cell-num">{fmtMoney(r.paid)}</TableCell>
+            <TableCell className={`cell-num font-semibold ${balanceClass}`}>
               {fmtMoney(r.balance)}
             </TableCell>
           </TableRow>
@@ -780,7 +893,7 @@ function BalanceTable({ rows, partyLabel, fmtMoney, total, balanceClass }) {
           <TableCell colSpan={3} className="font-semibold">
             Total
           </TableCell>
-          <TableCell className={`text-right font-semibold tabular-nums ${balanceClass}`}>
+          <TableCell className={`cell-num font-semibold ${balanceClass}`}>
             {fmtMoney(total)}
           </TableCell>
         </TableRow>
@@ -802,18 +915,18 @@ function AccountsReport({ data, fmtMoney, toast }) {
     [data],
   );
 
-  const onExport = makeCsvExporter(toast, 'creditors-debtors.csv', () => ({
-    headers: ['Type', 'Party', 'Invoiced', 'Paid', 'Balance'],
+  const onExport = makeCsvExporter(toast, "creditors-debtors.csv", () => ({
+    headers: ["Type", "Party", "Invoiced", "Paid", "Balance"],
     rows: [
       ...balances.debtors.map((d) => [
-        'Debtor',
+        "Debtor",
         d.party.company_name || d.party.name,
         money2(d.invoiced),
         money2(d.paid),
         money2(d.balance),
       ]),
       ...balances.creditors.map((c) => [
-        'Creditor',
+        "Creditor",
         c.party.company_name || c.party.name,
         money2(c.invoiced),
         money2(c.paid),
@@ -836,10 +949,12 @@ function AccountsReport({ data, fmtMoney, toast }) {
             <CardTitle className="text-base">Total receivable</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-700">
+            <p className="data-figure text-2xl font-semibold text-success">
               {fmtMoney(balances.total_receivable)}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Customers owe you</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Customers owe you
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -847,8 +962,12 @@ function AccountsReport({ data, fmtMoney, toast }) {
             <CardTitle className="text-base">Total payable</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-600">{fmtMoney(balances.total_payable)}</p>
-            <p className="text-xs text-gray-400 mt-1">You owe suppliers</p>
+            <p className="data-figure text-2xl font-semibold text-destructive">
+              {fmtMoney(balances.total_payable)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              You owe suppliers
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -859,14 +978,17 @@ function AccountsReport({ data, fmtMoney, toast }) {
         </CardHeader>
         <CardContent>
           {balances.debtors.length === 0 ? (
-            <EmptyState title="No outstanding debtors" hint="Confirmed unpaid orders create debtors." />
+            <EmptyState
+              title="No outstanding debtors"
+              hint="Confirmed unpaid orders create debtors."
+            />
           ) : (
             <BalanceTable
               rows={balances.debtors}
               partyLabel="Customer"
               fmtMoney={fmtMoney}
               total={balances.total_receivable}
-              balanceClass="text-green-700"
+              balanceClass="text-success"
             />
           )}
         </CardContent>
@@ -888,7 +1010,7 @@ function AccountsReport({ data, fmtMoney, toast }) {
               partyLabel="Supplier"
               fmtMoney={fmtMoney}
               total={balances.total_payable}
-              balanceClass="text-red-600"
+              balanceClass="text-destructive"
             />
           )}
         </CardContent>
@@ -904,17 +1026,17 @@ const ReportPage = () => {
   const { toast } = useToast();
   const { fmtMoney, currency } = useWorkspace();
   const { data, loading } = useTables(
-    'products',
-    'product_variants',
-    'categories',
-    'branches',
-    'orders',
-    'order_items',
-    'purchase_orders',
-    'payments',
-    'customers',
-    'suppliers',
-    'stock_movements',
+    "products",
+    "product_variants",
+    "categories",
+    "branches",
+    "orders",
+    "order_items",
+    "purchase_orders",
+    "payments",
+    "customers",
+    "suppliers",
+    "stock_movements",
   );
   const levels = useStockLevels();
 
@@ -925,12 +1047,15 @@ const ReportPage = () => {
       <div className="p-6 max-w-3xl mx-auto">
         <Card>
           <CardContent className="pt-6">
-          <EmptyState
-            title="Report not found"
-            hint={`There is no report called "${slug}".`}
-          />
+            <EmptyState
+              title="Report not found"
+              hint={`There is no report called "${slug}".`}
+            />
             <div className="text-center pb-4">
-              <Link to="/reports" className="text-sm text-blue-600 hover:text-blue-800">
+              <Link
+                to="/reports"
+                className="text-sm text-primary hover:text-blue-800"
+              >
                 Back to all reports
               </Link>
             </div>
@@ -950,15 +1075,15 @@ const ReportPage = () => {
 
   const common = { data, levels, fmtMoney, currency, toast };
   switch (slug) {
-    case 'inventory-valuation':
+    case "inventory-valuation":
       return <InventoryValuationReport {...common} />;
-    case 'stock-movements':
+    case "stock-movements":
       return <StockMovementsReport {...common} />;
-    case 'low-stock':
+    case "low-stock":
       return <LowStockReport {...common} />;
-    case 'sales':
+    case "sales":
       return <SalesReport {...common} />;
-    case 'accounts':
+    case "accounts":
       return <AccountsReport {...common} />;
     default:
       return null;

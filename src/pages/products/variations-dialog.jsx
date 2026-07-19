@@ -1,38 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Trash2, Plus } from 'lucide-react';
-import { parseAttributes } from './helpers';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Trash2, Plus } from "lucide-react";
+import { parseAttributes } from "./helpers";
 
 const emptyForm = {
-  name: '',
-  sku: '',
-  price: '',
-  cost_price: '',
-  reorder_point: '',
+  name: "",
+  sku: "",
+  price: "",
+  cost_price: "",
+  reorder_point: "",
   pairs: [], // attributes as [{key, value}] so typing a key never loses focus
 };
 
 function formFromVariant(variant) {
   if (!variant) return emptyForm;
   return {
-    name: variant.name || '',
-    sku: variant.sku || '',
-    price: variant.price ?? '',
-    cost_price: variant.cost_price ?? '',
-    reorder_point: variant.reorder_point ?? '',
-    pairs: Object.entries(parseAttributes(variant.attributes)).map(([key, value]) => ({
-      key,
-      value: String(value ?? ''),
-    })),
+    name: variant.name || "",
+    sku: variant.sku || "",
+    price: variant.price ?? "",
+    cost_price: variant.cost_price ?? "",
+    reorder_point: variant.reorder_point ?? "",
+    pairs: Object.entries(parseAttributes(variant.attributes)).map(
+      ([key, value]) => ({
+        key,
+        value: String(value ?? ""),
+      }),
+    ),
   };
 }
 
@@ -87,7 +89,9 @@ const ProductVariationDialog = ({ open, onOpenChange, variant, onSave }) => {
       <DialogContent className="sm:max-w-[520px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{variant ? 'Edit Variation' : 'Add New Variation'}</DialogTitle>
+            <DialogTitle>
+              {variant ? "Edit Variation" : "Add New Variation"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -131,7 +135,9 @@ const ProductVariationDialog = ({ open, onOpenChange, variant, onSave }) => {
                   step="0.01"
                   min="0"
                   value={form.cost_price}
-                  onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, cost_price: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -142,7 +148,9 @@ const ProductVariationDialog = ({ open, onOpenChange, variant, onSave }) => {
                   step="1"
                   min="0"
                   value={form.reorder_point}
-                  onChange={(e) => setForm({ ...form, reorder_point: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, reorder_point: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -182,7 +190,10 @@ const ProductVariationDialog = ({ open, onOpenChange, variant, onSave }) => {
                 size="sm"
                 className="mt-2"
                 onClick={() =>
-                  setForm((prev) => ({ ...prev, pairs: [...prev.pairs, { key: '', value: '' }] }))
+                  setForm((prev) => ({
+                    ...prev,
+                    pairs: [...prev.pairs, { key: "", value: "" }],
+                  }))
                 }
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -191,11 +202,15 @@ const ProductVariationDialog = ({ open, onOpenChange, variant, onSave }) => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid || saving}>
-              {saving ? 'Saving…' : variant ? 'Update' : 'Create'}
+              {saving ? "Saving…" : variant ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

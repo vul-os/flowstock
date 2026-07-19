@@ -1,12 +1,18 @@
-import { useState } from 'react';
-import Logo from '@/assets/flowstock-logo.svg';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { api, isDemo } from '@/services/api';
-import { useWorkspace } from '@/context/workspace-context';
+import { useState } from "react";
+import Logo from "@/assets/flowstock-logo.svg";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { api, isDemo } from "@/services/api";
+import { useWorkspace } from "@/context/workspace-context";
 
 /**
  * First-run screen. Two paths:
@@ -18,23 +24,23 @@ const SetupScreen = () => {
   const { refresh } = useWorkspace();
 
   // Create
-  const [businessName, setBusinessName] = useState('');
-  const [branchName, setBranchName] = useState('Head Office');
+  const [businessName, setBusinessName] = useState("");
+  const [branchName, setBranchName] = useState("Head Office");
 
   // Join
-  const [joinBusiness, setJoinBusiness] = useState('');
-  const [joinBranch, setJoinBranch] = useState('');
-  const [joinUrl, setJoinUrl] = useState('');
-  const [joinSecret, setJoinSecret] = useState('');
+  const [joinBusiness, setJoinBusiness] = useState("");
+  const [joinBranch, setJoinBranch] = useState("");
+  const [joinUrl, setJoinUrl] = useState("");
+  const [joinSecret, setJoinSecret] = useState("");
 
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const create = async (e) => {
     e.preventDefault();
     if (!businessName.trim() || !branchName.trim()) return;
     setBusy(true);
-    setError('');
+    setError("");
     try {
       await api.setupWorkspace(businessName.trim(), branchName.trim());
       await refresh();
@@ -48,7 +54,7 @@ const SetupScreen = () => {
     e.preventDefault();
     if (!joinUrl.trim() || !joinSecret.trim() || !joinBranch.trim()) return;
     setBusy(true);
-    setError('');
+    setError("");
     try {
       await api.joinWorkspace({
         url: joinUrl.trim(),
@@ -70,8 +76,8 @@ const SetupScreen = () => {
           <img src={Logo} alt="FlowStock" className="mb-2 h-16 w-16" />
           <CardTitle className="text-2xl">Welcome to FlowStock</CardTitle>
           <CardDescription>
-            Start a new business, or connect this device to an existing branch so
-            they share stock — even when one goes offline.
+            Start a new business, or connect this device to an existing branch
+            so they share stock — even when one goes offline.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,8 +111,12 @@ const SetupScreen = () => {
                   />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={busy || !businessName.trim()}>
-                  {busy ? 'Setting up…' : 'Create workspace'}
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={busy || !businessName.trim()}
+                >
+                  {busy ? "Setting up…" : "Create workspace"}
                 </Button>
               </form>
             </TabsContent>
@@ -115,8 +125,8 @@ const SetupScreen = () => {
               <form onSubmit={join} className="space-y-4 pt-2">
                 <p className="text-sm text-muted-foreground">
                   Enter another branch's address and the shared secret from its
-                  Settings → Sync. This device will pull the existing catalog and
-                  stock, then join as a new branch.
+                  Settings → Sync. This device will pull the existing catalog
+                  and stock, then join as a new branch.
                 </p>
                 <div className="space-y-2">
                   <Label htmlFor="join-branch">Name this branch</Label>
@@ -147,7 +157,9 @@ const SetupScreen = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="join-business">Business name (optional)</Label>
+                  <Label htmlFor="join-business">
+                    Business name (optional)
+                  </Label>
                   <Input
                     id="join-business"
                     placeholder="shown in this device's top bar"
@@ -159,9 +171,14 @@ const SetupScreen = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={busy || !joinUrl.trim() || !joinSecret.trim() || !joinBranch.trim()}
+                  disabled={
+                    busy ||
+                    !joinUrl.trim() ||
+                    !joinSecret.trim() ||
+                    !joinBranch.trim()
+                  }
                 >
-                  {busy ? 'Joining…' : 'Join workspace'}
+                  {busy ? "Joining…" : "Join workspace"}
                 </Button>
               </form>
             </TabsContent>

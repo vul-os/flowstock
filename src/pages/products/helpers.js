@@ -3,46 +3,49 @@
 /** Parse a variant's `attributes` JSON string into a plain object. */
 export function parseAttributes(raw) {
   if (!raw) return {};
-  if (typeof raw === 'object') return raw;
+  if (typeof raw === "object") return raw;
   try {
     const obj = JSON.parse(raw);
-    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {};
+    return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : {};
   } catch {
     return {};
   }
 }
 
 export const defaultProductData = {
-  material: '',
-  assortment: '',
-  applications: '',
+  material: "",
+  assortment: "",
+  applications: "",
   specifications: {
-    lengthRange: '',
-    material: '',
-    finish: '',
-    headType: '',
-    threadType: '',
-    packageQuantity: '',
+    lengthRange: "",
+    material: "",
+    finish: "",
+    headType: "",
+    threadType: "",
+    packageQuantity: "",
   },
 };
 
 /** Parse a product's `product_data` JSON string, filling in every spec field. */
 export function parseProductData(raw) {
   let data = raw;
-  if (typeof raw === 'string') {
+  if (typeof raw === "string") {
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
       data = {};
     }
   }
-  if (!data || typeof data !== 'object') data = {};
-  const specs = data.specifications && typeof data.specifications === 'object' ? data.specifications : {};
+  if (!data || typeof data !== "object") data = {};
+  const specs =
+    data.specifications && typeof data.specifications === "object"
+      ? data.specifications
+      : {};
   return {
     ...data,
-    material: data.material || '',
-    assortment: data.assortment || '',
-    applications: data.applications || '',
+    material: data.material || "",
+    assortment: data.assortment || "",
+    applications: data.applications || "",
     specifications: {
       ...defaultProductData.specifications,
       ...specs,

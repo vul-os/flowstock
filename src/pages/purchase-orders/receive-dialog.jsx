@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { PackageCheck } from 'lucide-react';
-import { api } from '@/services/api';
-import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useEffect, useMemo, useState } from "react";
+import { PackageCheck } from "lucide-react";
+import { api } from "@/services/api";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 
 /**
  * Receive goods against a purchase order. Only product lines are stockable;
@@ -34,12 +34,15 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
   const [saving, setSaving] = useState(false);
 
   const productLines = useMemo(
-    () => (items || []).filter((i) => (i.item_type || 'product') === 'product'),
+    () => (items || []).filter((i) => (i.item_type || "product") === "product"),
     [items],
   );
 
   const outstanding = (item) =>
-    Math.max(0, (Number(item.quantity) || 0) - (Number(item.received_quantity) || 0));
+    Math.max(
+      0,
+      (Number(item.quantity) || 0) - (Number(item.received_quantity) || 0),
+    );
 
   useEffect(() => {
     if (open) {
@@ -53,8 +56,8 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
 
   const label = (item) => {
     const v = variantsById?.get(item.product_variant_id);
-    if (!v) return item.description || item.product_variant_id || 'Item';
-    return `${v.product_name} — ${v.name || v.sku || ''}`.trim();
+    if (!v) return item.description || item.product_variant_id || "Item";
+    return `${v.product_name} — ${v.name || v.sku || ""}`.trim();
   };
 
   const submit = async () => {
@@ -62,7 +65,10 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
       .map((i) => ({ item_id: i.id, qty: Number(qty[i.id]) || 0 }))
       .filter((r) => r.qty > 0);
     if (receipts.length === 0) {
-      toast({ description: 'Enter a quantity to receive on at least one line.', variant: 'destructive' });
+      toast({
+        description: "Enter a quantity to receive on at least one line.",
+        variant: "destructive",
+      });
       return;
     }
     setSaving(true);
@@ -72,7 +78,10 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
       toast({ description: `Received ${total} unit(s) into stock.` });
       onClose();
     } catch (err) {
-      toast({ description: `Could not receive goods: ${err}`, variant: 'destructive' });
+      toast({
+        description: `Could not receive goods: ${err}`,
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -85,10 +94,12 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <PackageCheck className="h-5 w-5" /> Receive goods — {order.po_number}
+            <PackageCheck className="h-5 w-5" /> Receive goods —{" "}
+            {order.po_number}
           </DialogTitle>
           <DialogDescription>
-            Enter the quantities that arrived. Stock is added at this purchase order's branch.
+            Enter the quantities that arrived. Stock is added at this purchase
+            order's branch.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,12 +124,12 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{label(item)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="cell-num">{item.quantity}</TableCell>
+                    <TableCell className="cell-num">
                       {item.received_quantity || 0}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{out}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="cell-num">{out}</TableCell>
+                    <TableCell className="cell-num">
                       <Input
                         type="number"
                         min="0"
@@ -127,7 +138,10 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
                         disabled={out === 0}
                         value={qty[item.id] ?? 0}
                         onChange={(e) => {
-                          const v = Math.min(out, Math.max(0, Number(e.target.value) || 0));
+                          const v = Math.min(
+                            out,
+                            Math.max(0, Number(e.target.value) || 0),
+                          );
                           setQty((prev) => ({ ...prev, [item.id]: v }));
                         }}
                         className="text-right"
@@ -144,8 +158,11 @@ const ReceiveGoodsDialog = ({ open, onClose, order, items, variantsById }) => {
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={saving || productLines.length === 0}>
-            {saving ? 'Receiving…' : 'Receive into stock'}
+          <Button
+            onClick={submit}
+            disabled={saving || productLines.length === 0}
+          >
+            {saving ? "Receiving…" : "Receive into stock"}
           </Button>
         </DialogFooter>
       </DialogContent>

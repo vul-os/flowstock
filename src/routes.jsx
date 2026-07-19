@@ -1,20 +1,20 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from "react-router-dom";
 
-import MainLayout from './components/layout/main-layout';
+import MainLayout from "./components/layout/main-layout";
 
-import NotFound from './pages/not-found';
-import Dashboard from './pages/home';
-import ProductManagement from './pages/products';
-import ProductPage from './pages/products/product';
-import StockPage from './pages/stock';
-import ServicesPage from './pages/services';
-import PurchaseOrdersPage from './pages/purchase-orders';
-import OrdersPage from './pages/orders';
-import PartnersPage from './pages/partners';
-import CreditorsDebtorsPage from './pages/creditors-debtors';
-import ReportsPage from './pages/reports';
-import ReportPage from './pages/reports/report';
-import SettingsPage from './pages/settings';
+import NotFound from "./pages/not-found";
+import Dashboard from "./pages/home";
+import ProductManagement from "./pages/products";
+import ProductPage from "./pages/products/product";
+import StockPage from "./pages/stock";
+import ServicesPage from "./pages/services";
+import PurchaseOrdersPage from "./pages/purchase-orders";
+import OrdersPage from "./pages/orders";
+import PartnersPage from "./pages/partners";
+import CreditorsDebtorsPage from "./pages/creditors-debtors";
+import ReportsPage from "./pages/reports";
+import ReportPage from "./pages/reports/report";
+import SettingsPage from "./pages/settings";
 
 const AppRoutes = () => (
   <Routes>

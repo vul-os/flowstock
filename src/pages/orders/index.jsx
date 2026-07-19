@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from "react";
 import {
   Plus,
   FileText,
@@ -7,11 +7,11 @@ import {
   PencilLine,
   ChevronDown,
   ChevronRight,
-} from 'lucide-react';
-import { api } from '@/services/api';
-import { useWorkspace, useTables } from '@/context/workspace-context';
-import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { api } from "@/services/api";
+import { useWorkspace, useTables } from "@/context/workspace-context";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -19,55 +19,55 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
-import OrderDialog from './dialog';
+} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import OrderDialog from "./dialog";
 
 const STATUS_BADGE = {
-  draft: { variant: 'secondary', className: '' },
-  confirmed: { variant: 'default', className: '' },
-  paid: { variant: 'default', className: 'border-transparent bg-emerald-600 text-white hover:bg-emerald-600/80' },
-  cancelled: { variant: 'destructive', className: '' },
+  draft: { variant: "outline" },
+  confirmed: { variant: "flow" },
+  paid: { variant: "success" },
+  cancelled: { variant: "danger" },
 };
 
 function StatusBadge({ status }) {
   const cfg = STATUS_BADGE[status] || STATUS_BADGE.draft;
   return (
-    <Badge variant={cfg.variant} className={cfg.className}>
-      {(status || 'draft').replace(/_/g, ' ')}
+    <Badge variant={cfg.variant} className="capitalize">
+      {(status || "draft").replace(/_/g, " ")}
     </Badge>
   );
 }
 
 const formatDate = (dateString) =>
   dateString
-    ? new Date(dateString).toLocaleDateString('en-ZA', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+    ? new Date(dateString).toLocaleDateString("en-ZA", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       })
-    : '';
+    : "";
 
 const OrdersPage = () => {
   const { fmtMoney } = useWorkspace();
   const { toast } = useToast();
   const { data, loading } = useTables(
-    'orders',
-    'order_items',
-    'order_services',
-    'customers',
-    'product_variants',
-    'products',
-    'services',
-    'branches',
+    "orders",
+    "order_items",
+    "order_services",
+    "customers",
+    "product_variants",
+    "products",
+    "services",
+    "branches",
   );
 
   const [expandedOrders, setExpandedOrders] = useState({});
@@ -93,15 +93,18 @@ const OrdersPage = () => {
     const productsById = new Map((data.products || []).map((p) => [p.id, p]));
     return (data.product_variants || []).map((v) => ({
       ...v,
-      product_name: productsById.get(v.product_id)?.name || 'Unknown product',
+      product_name: productsById.get(v.product_id)?.name || "Unknown product",
     }));
   }, [data.product_variants, data.products]);
-  const variantsById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
+  const variantsById = useMemo(
+    () => new Map(variants.map((v) => [v.id, v])),
+    [variants],
+  );
 
   const orders = useMemo(
     () =>
       [...(data.orders || [])].sort((a, b) =>
-        (b.created_at || '').localeCompare(a.created_at || ''),
+        (b.created_at || "").localeCompare(a.created_at || ""),
       ),
     [data.orders],
   );
@@ -139,11 +142,14 @@ const OrdersPage = () => {
     try {
       setBusyOrderId(order.id);
       await api.setOrderStatus(order.id, status);
-      toast({ title: `Order ${order.order_number || ''} ${status}`, description });
+      toast({
+        title: `Order ${order.order_number || ""} ${status}`,
+        description,
+      });
     } catch (error) {
       toast({
-        variant: 'destructive',
-        title: 'Could not update order status',
+        variant: "destructive",
+        title: "Could not update order status",
         description: String(error?.message || error),
       });
     } finally {
@@ -159,10 +165,13 @@ const OrdersPage = () => {
     );
   }
 
-  const confirmedOrders = orders.filter((o) => o.status === 'confirmed');
-  const pendingPayment = confirmedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const confirmedOrders = orders.filter((o) => o.status === "confirmed");
+  const pendingPayment = confirmedOrders.reduce(
+    (sum, o) => sum + (o.total_amount || 0),
+    0,
+  );
   const paidTotal = orders
-    .filter((o) => o.status === 'paid')
+    .filter((o) => o.status === "paid")
     .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
   return (
@@ -170,8 +179,10 @@ const OrdersPage = () => {
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Orders</h1>
-          <p className="mt-2 text-muted-foreground">Manage your customer orders</p>
+          <h1 className="page-title">Orders</h1>
+          <p className="mt-2 text-muted-foreground">
+            Manage your customer orders
+          </p>
         </div>
         <Button onClick={handleCreateOrder}>
           <Plus className="mr-2 h-4 w-4" />
@@ -187,7 +198,9 @@ const OrdersPage = () => {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
+            <div className="data-figure text-2xl font-semibold">
+              {orders.length}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -196,19 +209,25 @@ const OrdersPage = () => {
             <PencilLine className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {orders.filter((o) => o.status === 'draft').length}
+            <div className="data-figure text-2xl font-semibold">
+              {orders.filter((o) => o.status === "draft").length}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payment</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Pending Payment
+            </CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fmtMoney(pendingPayment)}</div>
-            <p className="text-xs text-muted-foreground">{confirmedOrders.length} orders</p>
+            <div className="data-figure text-2xl font-semibold">
+              {fmtMoney(pendingPayment)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {confirmedOrders.length} orders
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -217,7 +236,9 @@ const OrdersPage = () => {
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fmtMoney(paidTotal)}</div>
+            <div className="data-figure text-2xl font-semibold">
+              {fmtMoney(paidTotal)}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -226,7 +247,9 @@ const OrdersPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>View and manage your customer orders</CardDescription>
+          <CardDescription>
+            View and manage your customer orders
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -246,7 +269,10 @@ const OrdersPage = () => {
             <TableBody>
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={9}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No orders yet. Create your first order to get started.
                   </TableCell>
                 </TableRow>
@@ -272,16 +298,20 @@ const OrdersPage = () => {
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">{order.order_number}</TableCell>
                       <TableCell className="font-medium">
-                        <div>{customer?.name || 'Unknown customer'}</div>
+                        {order.order_number}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div>{customer?.name || "Unknown customer"}</div>
                         {customer?.company_name ? (
                           <div className="text-sm text-muted-foreground">
                             {customer.company_name}
                           </div>
                         ) : null}
                       </TableCell>
-                      <TableCell>{branchesById.get(order.branch_id)?.name || '—'}</TableCell>
+                      <TableCell>
+                        {branchesById.get(order.branch_id)?.name || "—"}
+                      </TableCell>
                       <TableCell>{formatDate(order.order_date)}</TableCell>
                       <TableCell>{formatDate(order.due_date)}</TableCell>
                       <TableCell>
@@ -290,32 +320,42 @@ const OrdersPage = () => {
                       <TableCell>{fmtMoney(order.total_amount)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditOrder(order)}>
-                            {order.status === 'draft' ? 'Edit' : 'View Details'}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditOrder(order)}
+                          >
+                            {order.status === "draft" ? "Edit" : "View Details"}
                           </Button>
-                          {order.status === 'draft' && (
+                          {order.status === "draft" && (
                             <Button
                               variant="outline"
                               size="sm"
                               disabled={busy}
                               onClick={() =>
-                                handleStatusChange(order, 'confirmed', 'Stock has been deducted.')
+                                handleStatusChange(
+                                  order,
+                                  "confirmed",
+                                  "Stock has been deducted.",
+                                )
                               }
                             >
                               Confirm (deducts stock)
                             </Button>
                           )}
-                          {order.status === 'confirmed' && (
+                          {order.status === "confirmed" && (
                             <Button
                               variant="outline"
                               size="sm"
                               disabled={busy}
-                              onClick={() => handleStatusChange(order, 'paid')}
+                              onClick={() => handleStatusChange(order, "paid")}
                             >
                               Mark Paid
                             </Button>
                           )}
-                          {['draft', 'confirmed', 'paid'].includes(order.status) && (
+                          {["draft", "confirmed", "paid"].includes(
+                            order.status,
+                          ) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -324,14 +364,16 @@ const OrdersPage = () => {
                               onClick={() =>
                                 handleStatusChange(
                                   order,
-                                  'cancelled',
-                                  order.status === 'draft'
+                                  "cancelled",
+                                  order.status === "draft"
                                     ? undefined
-                                    : 'Stock movements have been reversed.',
+                                    : "Stock movements have been reversed.",
                                 )
                               }
                             >
-                              {order.status === 'draft' ? 'Cancel' : 'Cancel (restocks)'}
+                              {order.status === "draft"
+                                ? "Cancel"
+                                : "Cancel (restocks)"}
                             </Button>
                           )}
                         </div>
@@ -363,18 +405,26 @@ const OrdersPage = () => {
                                   </TableHeader>
                                   <TableBody>
                                     {items.map((item) => {
-                                      const variant = variantsById.get(item.product_variant_id);
+                                      const variant = variantsById.get(
+                                        item.product_variant_id,
+                                      );
                                       return (
                                         <TableRow key={item.id}>
                                           <TableCell>
                                             {variant
                                               ? `${variant.product_name} - ${variant.name}`
-                                              : 'Unknown product'}
+                                              : "Unknown product"}
                                           </TableCell>
-                                          <TableCell>{variant?.sku || '—'}</TableCell>
+                                          <TableCell>
+                                            {variant?.sku || "—"}
+                                          </TableCell>
                                           <TableCell>{item.quantity}</TableCell>
-                                          <TableCell>{fmtMoney(item.unit_price)}</TableCell>
-                                          <TableCell>{fmtMoney(item.total_price)}</TableCell>
+                                          <TableCell>
+                                            {fmtMoney(item.unit_price)}
+                                          </TableCell>
+                                          <TableCell>
+                                            {fmtMoney(item.total_price)}
+                                          </TableCell>
                                         </TableRow>
                                       );
                                     })}
@@ -401,13 +451,19 @@ const OrdersPage = () => {
                                     {services.map((service) => (
                                       <TableRow key={service.id}>
                                         <TableCell>
-                                          {servicesById.get(service.service_id)?.name ||
-                                            'Unknown service'}
+                                          {servicesById.get(service.service_id)
+                                            ?.name || "Unknown service"}
                                         </TableCell>
-                                        <TableCell>{service.description}</TableCell>
+                                        <TableCell>
+                                          {service.description}
+                                        </TableCell>
                                         <TableCell>{service.hours}</TableCell>
-                                        <TableCell>{fmtMoney(service.hourly_rate)}</TableCell>
-                                        <TableCell>{fmtMoney(service.total_price)}</TableCell>
+                                        <TableCell>
+                                          {fmtMoney(service.hourly_rate)}
+                                        </TableCell>
+                                        <TableCell>
+                                          {fmtMoney(service.total_price)}
+                                        </TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
@@ -430,8 +486,12 @@ const OrdersPage = () => {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         order={selectedOrder}
-        orderItems={selectedOrder ? itemsByOrder.get(selectedOrder.id) || [] : []}
-        orderServices={selectedOrder ? servicesByOrder.get(selectedOrder.id) || [] : []}
+        orderItems={
+          selectedOrder ? itemsByOrder.get(selectedOrder.id) || [] : []
+        }
+        orderServices={
+          selectedOrder ? servicesByOrder.get(selectedOrder.id) || [] : []
+        }
         customers={data.customers || []}
         variants={variants}
         services={data.services || []}

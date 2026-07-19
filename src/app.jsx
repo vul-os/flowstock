@@ -1,9 +1,9 @@
-import { HashRouter as Router } from 'react-router-dom';
-import AppRoutes from './routes';
-import { Toaster } from '@/components/ui/toaster';
-import { ThemeProvider } from '@/components/theme-provider';
-import { WorkspaceProvider, useWorkspace } from '@/context/workspace-context';
-import SetupScreen from '@/pages/setup';
+import { HashRouter as Router } from "react-router-dom";
+import AppRoutes from "./routes";
+import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
+import { WorkspaceProvider, useWorkspace } from "@/context/workspace-context";
+import SetupScreen from "@/pages/setup";
 
 const Gate = () => {
   const { loading, initialized } = useWorkspace();

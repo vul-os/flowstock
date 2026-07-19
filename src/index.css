@@ -10,10 +10,10 @@
  * Both self-hosted via @fontsource — no runtime CDN.
  * ------------------------------------------------------------------ */
 
-@import '@fontsource-variable/archivo/index.css';
-@import '@fontsource/ibm-plex-mono/latin-400.css';
-@import '@fontsource/ibm-plex-mono/latin-500.css';
-@import '@fontsource/ibm-plex-mono/latin-600.css';
+@import "@fontsource-variable/archivo/index.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
 
 @tailwind base;
 @tailwind components;
@@ -112,9 +112,11 @@
     --shadow-color: 28 25% 12%;
     --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.07);
     --shadow-sm:
-      0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 1px 3px 0 hsl(var(--shadow-color) / 0.08);
+      0 1px 2px 0 hsl(var(--shadow-color) / 0.06),
+      0 1px 3px 0 hsl(var(--shadow-color) / 0.08);
     --shadow-md:
-      0 2px 4px -1px hsl(var(--shadow-color) / 0.07), 0 4px 10px -2px hsl(var(--shadow-color) / 0.1);
+      0 2px 4px -1px hsl(var(--shadow-color) / 0.07),
+      0 4px 10px -2px hsl(var(--shadow-color) / 0.1);
     --shadow-lg:
       0 4px 8px -2px hsl(var(--shadow-color) / 0.08),
       0 12px 28px -6px hsl(var(--shadow-color) / 0.14);
@@ -134,9 +136,10 @@
 
     /* ---- type ------------------------------------------------------ */
     --font-sans:
-      'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue',
-      Arial, sans-serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      "Archivo Variable", "Archivo", ui-sans-serif, system-ui, -apple-system,
+      "Helvetica Neue", Arial, sans-serif;
+    --font-mono:
+      "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
   .dark {
@@ -186,11 +189,14 @@
     --shadow-color: 0 0% 0%;
     --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.4);
     --shadow-sm:
-      0 1px 2px 0 hsl(var(--shadow-color) / 0.4), 0 1px 3px 0 hsl(var(--shadow-color) / 0.5);
+      0 1px 2px 0 hsl(var(--shadow-color) / 0.4),
+      0 1px 3px 0 hsl(var(--shadow-color) / 0.5);
     --shadow-md:
-      0 2px 4px -1px hsl(var(--shadow-color) / 0.5), 0 4px 10px -2px hsl(var(--shadow-color) / 0.55);
+      0 2px 4px -1px hsl(var(--shadow-color) / 0.5),
+      0 4px 10px -2px hsl(var(--shadow-color) / 0.55);
     --shadow-lg:
-      0 4px 8px -2px hsl(var(--shadow-color) / 0.5), 0 12px 28px -6px hsl(var(--shadow-color) / 0.6);
+      0 4px 8px -2px hsl(var(--shadow-color) / 0.5),
+      0 12px 28px -6px hsl(var(--shadow-color) / 0.6);
     --shadow-xl: 0 24px 56px -12px hsl(var(--shadow-color) / 0.7);
   }
 }
@@ -209,8 +215,8 @@
     font-family: var(--font-sans);
     font-synthesis-weight: none;
     font-feature-settings:
-      'rlig' 1,
-      'calt' 1;
+      "rlig" 1,
+      "calt" 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -219,7 +225,7 @@
   /* Kraft grain: a barely-there paper tooth so large surfaces are not flat.
      Pure CSS, no image request. */
   body::before {
-    content: '';
+    content: "";
     position: fixed;
     inset: 0;
     z-index: 0;
@@ -261,7 +267,7 @@
   }
 
   /* Numerals: lining + tabular by default so ledger columns align */
-  input[type='number'],
+  input[type="number"],
   td,
   th {
     font-variant-numeric: tabular-nums lining-nums;
@@ -314,7 +320,7 @@
   .data-figure {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums lining-nums;
-    font-feature-settings: 'zero' 1;
+    font-feature-settings: "zero" 1;
     letter-spacing: -0.01em;
   }
 
@@ -323,7 +329,7 @@
     @apply text-right;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums lining-nums;
-    font-feature-settings: 'zero' 1;
+    font-feature-settings: "zero" 1;
   }
 
   /* Identifiers: SKUs, order numbers, peer fingerprints. */

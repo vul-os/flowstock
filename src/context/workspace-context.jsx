@@ -1,5 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from '@/services/api';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { api } from "@/services/api";
 
 const WorkspaceContext = createContext(null);
 
@@ -17,7 +24,7 @@ export function WorkspaceProvider({ children }) {
 
   useEffect(() => {
     refresh().catch((e) => {
-      console.error('bootstrap failed', e);
+      console.error("bootstrap failed", e);
       setLoading(false);
     });
     const off = api.onDataChanged(() => setDataVersion((v) => v + 1));
@@ -26,9 +33,9 @@ export function WorkspaceProvider({ children }) {
 
   const fmtMoney = useCallback(
     (n) => {
-      const symbol = boot?.currency?.symbol ?? 'R';
+      const symbol = boot?.currency?.symbol ?? "R";
       const value = Number(n || 0);
-      return `${symbol} ${value.toLocaleString('en-ZA', {
+      return `${symbol} ${value.toLocaleString("en-ZA", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
@@ -41,12 +48,12 @@ export function WorkspaceProvider({ children }) {
       loading,
       initialized: !!boot?.initialized,
       isDemo: api.isDemo,
-      businessName: boot?.business_name || '',
-      branchId: boot?.branch_id || '',
-      branchName: boot?.branch_name || '',
-      currency: boot?.currency || { code: 'ZAR', symbol: 'R' },
+      businessName: boot?.business_name || "",
+      branchId: boot?.branch_id || "",
+      branchName: boot?.branch_name || "",
+      currency: boot?.currency || { code: "ZAR", symbol: "R" },
       taxRate: boot?.tax_rate ?? 15,
-      nodeId: boot?.node_id || '',
+      nodeId: boot?.node_id || "",
       dataVersion,
       refresh,
       fmtMoney,
@@ -54,12 +61,17 @@ export function WorkspaceProvider({ children }) {
     [loading, boot, dataVersion, refresh, fmtMoney],
   );
 
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  return (
+    <WorkspaceContext.Provider value={value}>
+      {children}
+    </WorkspaceContext.Provider>
+  );
 }
 
 export function useWorkspace() {
   const ctx = useContext(WorkspaceContext);
-  if (!ctx) throw new Error('useWorkspace must be used within WorkspaceProvider');
+  if (!ctx)
+    throw new Error("useWorkspace must be used within WorkspaceProvider");
   return ctx;
 }
 
@@ -70,7 +82,7 @@ export function useWorkspace() {
 export function useTables(...tables) {
   const { dataVersion } = useWorkspace();
   const [state, setState] = useState({ data: {}, loading: true });
-  const key = tables.join(',');
+  const key = tables.join(",");
 
   useEffect(() => {
     let alive = true;
@@ -82,7 +94,7 @@ export function useTables(...tables) {
         setState({ data, loading: false });
       })
       .catch((e) => {
-        console.error('useTables failed', e);
+        console.error("useTables failed", e);
         if (alive) setState((s) => ({ ...s, loading: false }));
       });
     return () => {
@@ -103,7 +115,7 @@ export function useStockLevels() {
     api
       .getStockLevels()
       .then((l) => alive && setLevels(l))
-      .catch((e) => console.error('stock levels failed', e));
+      .catch((e) => console.error("stock levels failed", e));
     return () => {
       alive = false;
     };

@@ -1,24 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
-const emptyForm = { name: '', description: '', category_id: '' };
+const emptyForm = { name: "", description: "", category_id: "" };
 
 /**
  * Create / edit a product (name, description, category).
@@ -33,9 +33,9 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
       setForm(
         product
           ? {
-              name: product.name || '',
-              description: product.description || '',
-              category_id: product.category_id || '',
+              name: product.name || "",
+              description: product.description || "",
+              category_id: product.category_id || "",
             }
           : emptyForm,
       );
@@ -67,7 +67,9 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{product ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+            <DialogTitle>
+              {product ? "Edit Product" : "Add New Product"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -85,7 +87,9 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
               <Textarea
                 id="product-description"
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
                 placeholder="Product description"
               />
             </div>
@@ -93,7 +97,9 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
               <Label>Category</Label>
               <Select
                 value={form.category_id}
-                onValueChange={(value) => setForm({ ...form, category_id: value })}
+                onValueChange={(value) =>
+                  setForm({ ...form, category_id: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
@@ -109,11 +115,15 @@ const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid || saving}>
-              {saving ? 'Saving…' : product ? 'Update' : 'Create'}
+              {saving ? "Saving…" : product ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

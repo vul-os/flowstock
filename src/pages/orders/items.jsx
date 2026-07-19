@@ -1,17 +1,17 @@
-import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { FormItem, FormLabel, FormControl } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from "@/components/ui/select";
+import { FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
  * Product + service line item editors for the order dialog.
@@ -19,45 +19,57 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
  * service rows. When `disabled` (order no longer draft) everything is
  * read-only — the backend ignores line item changes for non-draft orders.
  */
-const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled = false }) => {
+const OrderItemsTabs = ({
+  form,
+  variants = [],
+  services = [],
+  fmtMoney,
+  disabled = false,
+}) => {
   const addProduct = () => {
-    const items = form.getValues('order_items') || [];
-    form.setValue('order_items', [
+    const items = form.getValues("order_items") || [];
+    form.setValue("order_items", [
       ...items,
-      { product_variant_id: '', quantity: 1, unit_price: 0, total_price: 0 },
+      { product_variant_id: "", quantity: 1, unit_price: 0, total_price: 0 },
     ]);
   };
 
   const addService = () => {
-    const svcs = form.getValues('order_services') || [];
-    form.setValue('order_services', [
+    const svcs = form.getValues("order_services") || [];
+    form.setValue("order_services", [
       ...svcs,
-      { service_id: '', hours: 1, hourly_rate: 0, total_price: 0, description: '' },
+      {
+        service_id: "",
+        hours: 1,
+        hourly_rate: 0,
+        total_price: 0,
+        description: "",
+      },
     ]);
   };
 
   const removeProduct = (index) => {
-    const items = form.getValues('order_items') || [];
+    const items = form.getValues("order_items") || [];
     form.setValue(
-      'order_items',
+      "order_items",
       items.filter((_, i) => i !== index),
     );
   };
 
   const removeService = (index) => {
-    const svcs = form.getValues('order_services') || [];
+    const svcs = form.getValues("order_services") || [];
     form.setValue(
-      'order_services',
+      "order_services",
       svcs.filter((_, i) => i !== index),
     );
   };
 
   const updateProduct = (index, field, value) => {
-    const items = form.getValues('order_items') || [];
+    const items = form.getValues("order_items") || [];
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
 
-    if (field === 'product_variant_id') {
+    if (field === "product_variant_id") {
       const variant = variants.find((v) => v.id === value);
       if (variant) {
         newItems[index].unit_price = variant.price || 0;
@@ -66,15 +78,15 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
     newItems[index].total_price =
       (newItems[index].quantity || 0) * (newItems[index].unit_price || 0);
 
-    form.setValue('order_items', newItems);
+    form.setValue("order_items", newItems);
   };
 
   const updateService = (index, field, value) => {
-    const svcs = form.getValues('order_services') || [];
+    const svcs = form.getValues("order_services") || [];
     const newServices = [...svcs];
     newServices[index] = { ...newServices[index], [field]: value };
 
-    if (field === 'service_id') {
+    if (field === "service_id") {
       const service = services.find((s) => s.id === value);
       if (service) {
         newServices[index].hourly_rate = service.hourly_rate || 0;
@@ -83,7 +95,7 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
     newServices[index].total_price =
       (newServices[index].hours || 0) * (newServices[index].hourly_rate || 0);
 
-    form.setValue('order_services', newServices);
+    form.setValue("order_services", newServices);
   };
 
   return (
@@ -108,16 +120,23 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(form.watch('order_items') || []).length === 0 && (
-                <div className="text-sm text-muted-foreground">No products on this order.</div>
+              {(form.watch("order_items") || []).length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  No products on this order.
+                </div>
               )}
-              {(form.watch('order_items') || []).map((item, index) => (
-                <div key={item.id || index} className="grid grid-cols-6 items-start gap-4">
+              {(form.watch("order_items") || []).map((item, index) => (
+                <div
+                  key={item.id || index}
+                  className="grid grid-cols-6 items-start gap-4"
+                >
                   <div className="col-span-2">
                     <FormLabel>Product</FormLabel>
                     <Select
-                      value={item.product_variant_id || ''}
-                      onValueChange={(value) => updateProduct(index, 'product_variant_id', value)}
+                      value={item.product_variant_id || ""}
+                      onValueChange={(value) =>
+                        updateProduct(index, "product_variant_id", value)
+                      }
                       disabled={disabled}
                     >
                       <SelectTrigger>
@@ -126,7 +145,8 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                       <SelectContent>
                         {variants.map((variant) => (
                           <SelectItem key={variant.id} value={variant.id}>
-                            {variant.product_name} - {variant.name} ({variant.sku}) —{' '}
+                            {variant.product_name} - {variant.name} (
+                            {variant.sku}) —{""}
                             {fmtMoney(variant.price)}
                           </SelectItem>
                         ))}
@@ -143,7 +163,11 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                         value={item.quantity}
                         disabled={disabled}
                         onChange={(e) =>
-                          updateProduct(index, 'quantity', parseInt(e.target.value, 10) || 0)
+                          updateProduct(
+                            index,
+                            "quantity",
+                            parseInt(e.target.value, 10) || 0,
+                          )
                         }
                       />
                     </FormControl>
@@ -159,7 +183,11 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                         value={item.unit_price}
                         disabled={disabled}
                         onChange={(e) =>
-                          updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)
+                          updateProduct(
+                            index,
+                            "unit_price",
+                            parseFloat(e.target.value) || 0,
+                          )
                         }
                       />
                     </FormControl>
@@ -206,17 +234,21 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {(form.watch('order_services') || []).length === 0 && (
-                <div className="text-sm text-muted-foreground">No services on this order.</div>
+              {(form.watch("order_services") || []).length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  No services on this order.
+                </div>
               )}
-              {(form.watch('order_services') || []).map((service, index) => (
+              {(form.watch("order_services") || []).map((service, index) => (
                 <div key={service.id || index} className="space-y-4">
                   <div className="grid grid-cols-6 items-start gap-4">
                     <div className="col-span-2">
                       <FormLabel>Service</FormLabel>
                       <Select
-                        value={service.service_id || ''}
-                        onValueChange={(value) => updateService(index, 'service_id', value)}
+                        value={service.service_id || ""}
+                        onValueChange={(value) =>
+                          updateService(index, "service_id", value)
+                        }
                         disabled={disabled}
                       >
                         <SelectTrigger>
@@ -242,7 +274,11 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                           value={service.hours}
                           disabled={disabled}
                           onChange={(e) =>
-                            updateService(index, 'hours', parseFloat(e.target.value) || 0)
+                            updateService(
+                              index,
+                              "hours",
+                              parseFloat(e.target.value) || 0,
+                            )
                           }
                         />
                       </FormControl>
@@ -258,7 +294,11 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                           value={service.hourly_rate}
                           disabled={disabled}
                           onChange={(e) =>
-                            updateService(index, 'hourly_rate', parseFloat(e.target.value) || 0)
+                            updateService(
+                              index,
+                              "hourly_rate",
+                              parseFloat(e.target.value) || 0,
+                            )
                           }
                         />
                       </FormControl>
@@ -291,7 +331,9 @@ const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled
                       <Textarea
                         value={service.description}
                         disabled={disabled}
-                        onChange={(e) => updateService(index, 'description', e.target.value)}
+                        onChange={(e) =>
+                          updateService(index, "description", e.target.value)
+                        }
                         placeholder="Describe the service details..."
                       />
                     </FormControl>

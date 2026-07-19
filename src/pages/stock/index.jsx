@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeftRight, Loader2, Search, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Loader2,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -14,14 +20,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -29,22 +35,28 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/services/api';
-import { useStockLevels, useTables, useWorkspace } from '@/context/workspace-context';
-import { MOVEMENT_KIND_LABELS, movementLedger } from '@/lib/reports';
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "@/services/api";
+import {
+  useStockLevels,
+  useTables,
+  useWorkspace,
+} from "@/context/workspace-context";
+import { MOVEMENT_KIND_LABELS, movementLedger } from "@/lib/reports";
 
-const errMsg = (e) => (typeof e === 'string' ? e : e?.message || String(e));
+const errMsg = (e) => (typeof e === "string" ? e : e?.message || String(e));
 
 const num = (v) => Number(v || 0);
 
 const fmtQty = (v) => {
   const n = num(v);
-  return Number.isInteger(n) ? String(n) : n.toLocaleString('en-ZA', { maximumFractionDigits: 3 });
+  return Number.isInteger(n)
+    ? String(n)
+    : n.toLocaleString("en-ZA", { maximumFractionDigits: 3 });
 };
 
 const fmtDelta = (v) => {
@@ -53,28 +65,28 @@ const fmtDelta = (v) => {
 };
 
 const fmtWhen = (iso) => {
-  if (!iso) return '—';
+  if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? iso
-    : d.toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' });
+    : d.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 };
 
 const KIND_BADGE = {
-  receive: 'bg-green-100 text-green-800',
-  transfer_in: 'bg-green-100 text-green-800',
-  sale: 'bg-red-100 text-red-800',
-  transfer_out: 'bg-red-100 text-red-800',
-  adjustment: 'bg-amber-100 text-amber-800',
-  count: 'bg-amber-100 text-amber-800',
-  reversal: 'bg-gray-100 text-gray-700',
+  receive: "bg-success-muted text-success",
+  transfer_in: "bg-success-muted text-success",
+  sale: "bg-destructive-muted text-destructive",
+  transfer_out: "bg-destructive-muted text-destructive",
+  adjustment: "bg-signal-muted text-signal-text",
+  count: "bg-signal-muted text-signal-text",
+  reversal: "bg-muted text-foreground",
 };
 
 function KindBadge({ kind }) {
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-        KIND_BADGE[kind] || 'bg-gray-100 text-gray-700'
+        KIND_BADGE[kind] || "bg-muted text-foreground"
       }`}
     >
       {MOVEMENT_KIND_LABELS[kind] || kind}
@@ -84,7 +96,7 @@ function KindBadge({ kind }) {
 
 /** Searchable variant picker used inside the dialogs. */
 function VariantPicker({ rows, value, onChange }) {
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState("");
   const selected = rows.find((r) => r.id === value);
 
   if (selected) {
@@ -94,9 +106,16 @@ function VariantPicker({ rows, value, onChange }) {
           <p className="truncate font-medium">
             {selected.product} — {selected.name}
           </p>
-          <p className="text-xs text-gray-500">SKU {selected.sku || '—'}</p>
+          <p className="text-xs text-muted-foreground">
+            SKU {selected.sku || "—"}
+          </p>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onChange('')}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange("")}
+        >
           Change
         </Button>
       </div>
@@ -106,7 +125,9 @@ function VariantPicker({ rows, value, onChange }) {
   const needle = q.trim().toLowerCase();
   const filtered = rows
     .filter(
-      (r) => !needle || `${r.product} ${r.name} ${r.sku || ''}`.toLowerCase().includes(needle),
+      (r) =>
+        !needle ||
+        `${r.product} ${r.name} ${r.sku || ""}`.toLowerCase().includes(needle),
     )
     .slice(0, 30);
 
@@ -120,7 +141,9 @@ function VariantPicker({ rows, value, onChange }) {
       />
       <div className="max-h-44 divide-y overflow-y-auto rounded-md border">
         {filtered.length === 0 ? (
-          <p className="p-3 text-sm text-gray-500">No matching variants.</p>
+          <p className="p-3 text-sm text-muted-foreground">
+            No matching variants.
+          </p>
         ) : (
           filtered.map((r) => (
             <button
@@ -132,7 +155,9 @@ function VariantPicker({ rows, value, onChange }) {
               <span className="truncate">
                 {r.product} — {r.name}
               </span>
-              <span className="shrink-0 text-xs text-gray-500">{r.sku || ''}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {r.sku || ""}
+              </span>
             </button>
           ))
         )}
@@ -145,7 +170,7 @@ function BranchSelect({ id, branches, value, onChange, placeholder }) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder || 'Select branch'} />
+        <SelectValue placeholder={placeholder || "Select branch"} />
       </SelectTrigger>
       <SelectContent>
         {branches.map((b) => (
@@ -161,73 +186,100 @@ function BranchSelect({ id, branches, value, onChange, placeholder }) {
 // ── Adjust stock dialog ──────────────────────────────────────────────────────
 
 const ADJUST_KINDS = [
-  { value: 'receive', label: 'Goods received' },
-  { value: 'adjustment', label: 'Adjustment (+/-)' },
-  { value: 'count', label: 'Stock count' },
+  { value: "receive", label: "Goods received" },
+  { value: "adjustment", label: "Adjustment (+/-)" },
+  { value: "count", label: "Stock count" },
 ];
 
-function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, defaultBranchId }) {
+function AdjustDialog({
+  open,
+  onOpenChange,
+  variantRows,
+  branches,
+  levelMap,
+  defaultBranchId,
+}) {
   const { toast } = useToast();
-  const [variantId, setVariantId] = useState('');
-  const [branchId, setBranchId] = useState('');
-  const [kind, setKind] = useState('receive');
-  const [qty, setQty] = useState('');
-  const [counted, setCounted] = useState('');
-  const [note, setNote] = useState('');
+  const [variantId, setVariantId] = useState("");
+  const [branchId, setBranchId] = useState("");
+  const [kind, setKind] = useState("receive");
+  const [qty, setQty] = useState("");
+  const [counted, setCounted] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setVariantId('');
-      setBranchId(defaultBranchId || '');
-      setKind('receive');
-      setQty('');
-      setCounted('');
-      setNote('');
+      setVariantId("");
+      setBranchId(defaultBranchId || "");
+      setKind("receive");
+      setQty("");
+      setCounted("");
+      setNote("");
     }
   }, [open, defaultBranchId]);
 
   const currentQty =
-    variantId && branchId ? num(levelMap.get(`${variantId}|${branchId}`)) : null;
+    variantId && branchId
+      ? num(levelMap.get(`${variantId}|${branchId}`))
+      : null;
 
   const submit = async (e) => {
     e.preventDefault();
     if (!variantId || !branchId) {
-      toast({ variant: 'destructive', title: 'Pick a variant and a branch first' });
+      toast({
+        variant: "destructive",
+        title: "Pick a variant and a branch first",
+      });
       return;
     }
     let qtyDelta;
-    if (kind === 'count') {
+    if (kind === "count") {
       const c = Number(counted);
-      if (!Number.isFinite(c) || counted === '') {
-        toast({ variant: 'destructive', title: 'Enter the counted quantity' });
+      if (!Number.isFinite(c) || counted === "") {
+        toast({ variant: "destructive", title: "Enter the counted quantity" });
         return;
       }
       qtyDelta = c - (currentQty || 0);
       if (qtyDelta === 0) {
-        toast({ title: 'No change', description: 'Counted quantity matches the current level.' });
+        toast({
+          title: "No change",
+          description: "Counted quantity matches the current level.",
+        });
         return;
       }
     } else {
       qtyDelta = Number(qty);
       if (!Number.isFinite(qtyDelta) || qtyDelta === 0) {
-        toast({ variant: 'destructive', title: 'Quantity may not be zero' });
+        toast({ variant: "destructive", title: "Quantity may not be zero" });
         return;
       }
-      if (kind === 'receive' && qtyDelta < 0) {
-        toast({ variant: 'destructive', title: 'Received quantity must be positive' });
+      if (kind === "receive" && qtyDelta < 0) {
+        toast({
+          variant: "destructive",
+          title: "Received quantity must be positive",
+        });
         return;
       }
     }
     setSaving(true);
     try {
-      await api.adjustStock({ variantId, branchId, qtyDelta, kind, note: note.trim() });
-      toast({ title: 'Stock updated', description: `Recorded ${fmtDelta(qtyDelta)}.` });
+      await api.adjustStock({
+        variantId,
+        branchId,
+        qtyDelta,
+        kind,
+        note: note.trim(),
+      });
+      toast({
+        title: "Stock updated",
+        description: `Recorded ${fmtDelta(qtyDelta)}.`,
+      });
       onOpenChange(false);
     } catch (err) {
       toast({
-        variant: 'destructive',
-        title: 'Could not update stock',
+        variant: "destructive",
+        title: "Could not update stock",
         description: errMsg(err),
       });
     } finally {
@@ -241,13 +293,18 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
         <DialogHeader>
           <DialogTitle>Adjust stock</DialogTitle>
           <DialogDescription>
-            Record received goods, a manual adjustment or a physical stock count.
+            Record received goods, a manual adjustment or a physical stock
+            count.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label>Variant</Label>
-            <VariantPicker rows={variantRows} value={variantId} onChange={setVariantId} />
+            <VariantPicker
+              rows={variantRows}
+              value={variantId}
+              onChange={setVariantId}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -275,7 +332,7 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
               </Select>
             </div>
           </div>
-          {kind === 'count' ? (
+          {kind === "count" ? (
             <div className="space-y-2">
               <Label htmlFor="adj_counted">Counted quantity</Label>
               <Input
@@ -288,11 +345,11 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
                 placeholder="Physical quantity on the shelf"
               />
               {currentQty !== null && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   System shows {fmtQty(currentQty)}
-                  {counted !== '' && Number.isFinite(Number(counted))
+                  {counted !== "" && Number.isFinite(Number(counted))
                     ? ` — will record a ${fmtDelta(Number(counted) - currentQty)} correction`
-                    : ''}
+                    : ""}
                   .
                 </p>
               )}
@@ -300,7 +357,9 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
           ) : (
             <div className="space-y-2">
               <Label htmlFor="adj_qty">
-                {kind === 'receive' ? 'Quantity received' : 'Quantity change (+/-)'}
+                {kind === "receive"
+                  ? "Quantity received"
+                  : "Quantity change (+/-)"}
               </Label>
               <Input
                 id="adj_qty"
@@ -308,10 +367,14 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
                 step="any"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
-                placeholder={kind === 'receive' ? 'e.g. 24' : 'e.g. -3 for shrinkage'}
+                placeholder={
+                  kind === "receive" ? "e.g. 24" : "e.g. -3 for shrinkage"
+                }
               />
               {currentQty !== null && (
-                <p className="text-xs text-gray-500">Current level: {fmtQty(currentQty)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Current level: {fmtQty(currentQty)}
+                </p>
               )}
             </div>
           )}
@@ -325,7 +388,11 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
@@ -341,52 +408,79 @@ function AdjustDialog({ open, onOpenChange, variantRows, branches, levelMap, def
 
 // ── Transfer dialog ──────────────────────────────────────────────────────────
 
-function TransferDialog({ open, onOpenChange, variantRows, branches, levelMap, defaultBranchId }) {
+function TransferDialog({
+  open,
+  onOpenChange,
+  variantRows,
+  branches,
+  levelMap,
+  defaultBranchId,
+}) {
   const { toast } = useToast();
-  const [variantId, setVariantId] = useState('');
-  const [fromBranchId, setFromBranchId] = useState('');
-  const [toBranchId, setToBranchId] = useState('');
-  const [qty, setQty] = useState('');
-  const [note, setNote] = useState('');
+  const [variantId, setVariantId] = useState("");
+  const [fromBranchId, setFromBranchId] = useState("");
+  const [toBranchId, setToBranchId] = useState("");
+  const [qty, setQty] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setVariantId('');
-      setFromBranchId(defaultBranchId || '');
-      setToBranchId('');
-      setQty('');
-      setNote('');
+      setVariantId("");
+      setFromBranchId(defaultBranchId || "");
+      setToBranchId("");
+      setQty("");
+      setNote("");
     }
   }, [open, defaultBranchId]);
 
   const available =
-    variantId && fromBranchId ? num(levelMap.get(`${variantId}|${fromBranchId}`)) : null;
+    variantId && fromBranchId
+      ? num(levelMap.get(`${variantId}|${fromBranchId}`))
+      : null;
 
   const submit = async (e) => {
     e.preventDefault();
     if (!variantId || !fromBranchId || !toBranchId) {
-      toast({ variant: 'destructive', title: 'Pick a variant and both branches first' });
+      toast({
+        variant: "destructive",
+        title: "Pick a variant and both branches first",
+      });
       return;
     }
     if (fromBranchId === toBranchId) {
-      toast({ variant: 'destructive', title: 'Cannot transfer to the same branch' });
+      toast({
+        variant: "destructive",
+        title: "Cannot transfer to the same branch",
+      });
       return;
     }
     const q = Number(qty);
     if (!Number.isFinite(q) || q <= 0) {
-      toast({ variant: 'destructive', title: 'Transfer quantity must be positive' });
+      toast({
+        variant: "destructive",
+        title: "Transfer quantity must be positive",
+      });
       return;
     }
     setSaving(true);
     try {
-      await api.transferStock({ variantId, fromBranchId, toBranchId, qty: q, note: note.trim() });
-      toast({ title: 'Transfer recorded', description: `Moved ${fmtQty(q)} between branches.` });
+      await api.transferStock({
+        variantId,
+        fromBranchId,
+        toBranchId,
+        qty: q,
+        note: note.trim(),
+      });
+      toast({
+        title: "Transfer recorded",
+        description: `Moved ${fmtQty(q)} between branches.`,
+      });
       onOpenChange(false);
     } catch (err) {
       toast({
-        variant: 'destructive',
-        title: 'Could not record transfer',
+        variant: "destructive",
+        title: "Could not record transfer",
         description: errMsg(err),
       });
     } finally {
@@ -406,7 +500,11 @@ function TransferDialog({ open, onOpenChange, variantRows, branches, levelMap, d
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label>Variant</Label>
-            <VariantPicker rows={variantRows} value={variantId} onChange={setVariantId} />
+            <VariantPicker
+              rows={variantRows}
+              value={variantId}
+              onChange={setVariantId}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -418,7 +516,9 @@ function TransferDialog({ open, onOpenChange, variantRows, branches, levelMap, d
                 onChange={setFromBranchId}
               />
               {available !== null && (
-                <p className="text-xs text-gray-500">Available: {fmtQty(available)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Available: {fmtQty(available)}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -455,7 +555,11 @@ function TransferDialog({ open, onOpenChange, variantRows, branches, levelMap, d
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
@@ -472,21 +576,32 @@ function TransferDialog({ open, onOpenChange, variantRows, branches, levelMap, d
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 const StockPage = () => {
-  const { data, loading } = useTables('branches', 'products', 'product_variants', 'stock_movements');
+  const { data, loading } = useTables(
+    "branches",
+    "products",
+    "product_variants",
+    "stock_movements",
+  );
   const levels = useStockLevels();
   const { branchId } = useWorkspace();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [ledgerBranch, setLedgerBranch] = useState('all');
-  const [ledgerKind, setLedgerKind] = useState('all');
+  const [ledgerBranch, setLedgerBranch] = useState("all");
+  const [ledgerKind, setLedgerKind] = useState("all");
 
   const branches = useMemo(() => data.branches || [], [data.branches]);
   const products = useMemo(() => data.products || [], [data.products]);
-  const variants = useMemo(() => data.product_variants || [], [data.product_variants]);
-  const movements = useMemo(() => data.stock_movements || [], [data.stock_movements]);
+  const variants = useMemo(
+    () => data.product_variants || [],
+    [data.product_variants],
+  );
+  const movements = useMemo(
+    () => data.stock_movements || [],
+    [data.stock_movements],
+  );
 
   const levelMap = useMemo(() => {
     const m = new Map();
@@ -504,12 +619,14 @@ const StockPage = () => {
         );
         return {
           ...v,
-          product: productName.get(v.product_id) || '—',
+          product: productName.get(v.product_id) || "—",
           total,
           low: num(v.reorder_point) > 0 && total <= num(v.reorder_point),
         };
       })
-      .sort((a, b) => `${a.product} ${a.name}`.localeCompare(`${b.product} ${b.name}`));
+      .sort((a, b) =>
+        `${a.product} ${a.name}`.localeCompare(`${b.product} ${b.name}`),
+      );
   }, [variants, products, branches, levelMap]);
 
   const matrixRows = useMemo(() => {
@@ -517,7 +634,9 @@ const StockPage = () => {
     return variantRows.filter((v) => {
       if (lowOnly && !v.low) return false;
       if (!needle) return true;
-      return `${v.product} ${v.name} ${v.sku || ''}`.toLowerCase().includes(needle);
+      return `${v.product} ${v.name} ${v.sku || ""}`
+        .toLowerCase()
+        .includes(needle);
     });
   }, [variantRows, search, lowOnly]);
 
@@ -529,8 +648,8 @@ const StockPage = () => {
   const ledgerRows = useMemo(
     () =>
       ledger
-        .filter((m) => ledgerBranch === 'all' || m.branch_id === ledgerBranch)
-        .filter((m) => ledgerKind === 'all' || m.kind === ledgerKind)
+        .filter((m) => ledgerBranch === "all" || m.branch_id === ledgerBranch)
+        .filter((m) => ledgerKind === "all" || m.kind === ledgerKind)
         .slice(0, 200),
     [ledger, ledgerBranch, ledgerKind],
   );
@@ -541,8 +660,10 @@ const StockPage = () => {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Stock</h1>
-          <p className="text-gray-500">Stock on hand per branch, adjustments and transfers.</p>
+          <h1 className="page-title">Stock</h1>
+          <p className="text-muted-foreground">
+            Stock on hand per branch, adjustments and transfers.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setTransferOpen(true)}>
@@ -562,12 +683,13 @@ const StockPage = () => {
             <div className="space-y-1.5">
               <CardTitle>Stock on hand</CardTitle>
               <CardDescription>
-                Quantities per branch. Rows at or below their reorder point are highlighted.
+                Quantities per branch. Rows at or below their reorder point are
+                highlighted.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -576,12 +698,12 @@ const StockPage = () => {
                 />
               </div>
               <Button
-                variant={lowOnly ? 'default' : 'outline'}
+                variant={lowOnly ? "default" : "outline"}
                 size="sm"
                 onClick={() => setLowOnly((v) => !v)}
               >
                 <AlertTriangle className="mr-2 h-4 w-4" />
-                Low stock only{lowCount > 0 ? ` (${lowCount})` : ''}
+                Low stock only{lowCount > 0 ? ` (${lowCount})` : ""}
               </Button>
             </div>
           </div>
@@ -589,14 +711,15 @@ const StockPage = () => {
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : variantRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
-              No product variants yet. Add products first, then record stock here.
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No product variants yet. Add products first, then record stock
+              here.
             </p>
           ) : matrixRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No variants match the current filter.
             </p>
           ) : (
@@ -612,31 +735,40 @@ const StockPage = () => {
                         {b.name}
                       </TableHead>
                     ))}
-                    <TableHead className="text-right font-semibold">Total</TableHead>
+                    <TableHead className="text-right font-semibold">
+                      Total
+                    </TableHead>
                     <TableHead className="text-right">Reorder pt</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {matrixRows.map((v) => (
-                    <TableRow key={v.id} className={v.low ? 'bg-amber-50' : undefined}>
+                    <TableRow
+                      key={v.id}
+                      className={v.low ? "bg-signal-muted" : undefined}
+                    >
                       <TableCell className="font-medium">{v.product}</TableCell>
                       <TableCell>{v.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-gray-500">
-                        {v.sku || '—'}
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {v.sku || "—"}
                       </TableCell>
                       {branches.map((b) => (
-                        <TableCell key={b.id} className="text-right tabular-nums">
+                        <TableCell key={b.id} className="cell-num">
                           {fmtQty(levelMap.get(`${v.id}|${b.id}`))}
                         </TableCell>
                       ))}
-                      <TableCell className="text-right font-semibold tabular-nums">
+                      <TableCell className="cell-num font-semibold">
                         <span className="inline-flex items-center gap-1">
-                          {v.low && <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />}
+                          {v.low && (
+                            <AlertTriangle className="h-3.5 w-3.5 text-signal-text" />
+                          )}
                           {fmtQty(v.total)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-gray-500">
-                        {num(v.reorder_point) > 0 ? fmtQty(v.reorder_point) : '—'}
+                      <TableCell className="cell-num text-muted-foreground">
+                        {num(v.reorder_point) > 0
+                          ? fmtQty(v.reorder_point)
+                          : "—"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -653,7 +785,8 @@ const StockPage = () => {
             <div className="space-y-1.5">
               <CardTitle>Movement ledger</CardTitle>
               <CardDescription>
-                Every stock change, newest first{ledger.length > 200 ? ' (latest 200 shown)' : ''}.
+                Every stock change, newest first
+                {ledger.length > 200 ? " (latest 200 shown)" : ""}.
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -676,11 +809,13 @@ const StockPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All kinds</SelectItem>
-                  {Object.entries(MOVEMENT_KIND_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(MOVEMENT_KIND_LABELS).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -688,7 +823,7 @@ const StockPage = () => {
         </CardHeader>
         <CardContent>
           {ledgerRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No stock movements match the current filter.
             </p>
           ) : (
@@ -707,14 +842,19 @@ const StockPage = () => {
                 <TableBody>
                   {ledgerRows.map((m) => (
                     <TableRow key={m.id}>
-                      <TableCell className="whitespace-nowrap text-gray-500">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {fmtWhen(m.created_at)}
                       </TableCell>
                       <TableCell>
                         <span className="font-medium">{m.product}</span>
-                        <span className="text-gray-500"> — {m.variant}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          — {m.variant}
+                        </span>
                         {m.sku && (
-                          <span className="ml-2 font-mono text-xs text-gray-400">{m.sku}</span>
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">
+                            {m.sku}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>{m.branch}</TableCell>
@@ -724,20 +864,22 @@ const StockPage = () => {
                       <TableCell
                         className={`text-right font-medium tabular-nums ${
                           num(m.qty_delta) > 0
-                            ? 'text-green-600'
+                            ? "text-success"
                             : num(m.qty_delta) < 0
-                              ? 'text-red-600'
-                              : 'text-gray-500'
+                              ? "text-destructive"
+                              : "text-muted-foreground"
                         }`}
                       >
                         {fmtDelta(m.qty_delta)}
                       </TableCell>
-                      <TableCell className="max-w-64 text-gray-500">
+                      <TableCell className="max-w-64 text-muted-foreground">
                         <span className="block truncate" title={m.note}>
-                          {m.note || '—'}
+                          {m.note || "—"}
                         </span>
                         {m.created_by && (
-                          <span className="block text-xs text-gray-400">by {m.created_by}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            by {m.created_by}
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>

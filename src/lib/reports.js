@@ -9,7 +9,9 @@ const num = (v) => Number(v || 0);
 /** Sum stock per variant across branches. levels = [{variant_id, branch_id, qty}] */
 export function totalsByVariant(levels) {
   const map = new Map();
-  levels.forEach((l) => map.set(l.variant_id, (map.get(l.variant_id) || 0) + num(l.qty)));
+  levels.forEach((l) =>
+    map.set(l.variant_id, (map.get(l.variant_id) || 0) + num(l.qty)),
+  );
   return map;
 }
 
@@ -35,7 +37,7 @@ export function inventoryValuation(products, variants, levels) {
     const qty = totals.get(v.id) || 0;
     return {
       variant_id: v.id,
-      product: productName.get(v.product_id) || '—',
+      product: productName.get(v.product_id) || "—",
       variant: v.name,
       sku: v.sku,
       qty,
@@ -52,7 +54,7 @@ export function inventoryValuation(products, variants, levels) {
   };
 }
 
-const monthKey = (iso) => (iso || '').slice(0, 7); // YYYY-MM
+const monthKey = (iso) => (iso || "").slice(0, 7); // YYYY-MM
 
 /** Sales by calendar month over the trailing `months`, from non-cancelled orders. */
 export function salesByMonth(orders, months = 6) {
@@ -60,11 +62,13 @@ export function salesByMonth(orders, months = 6) {
   const keys = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    keys.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    );
   }
   const sums = new Map(keys.map((k) => [k, { total: 0, count: 0 }]));
   orders
-    .filter((o) => ['confirmed', 'paid'].includes(o.status))
+    .filter((o) => ["confirmed", "paid"].includes(o.status))
     .forEach((o) => {
       const k = monthKey(o.order_date || o.created_at);
       if (sums.has(k)) {
@@ -75,15 +79,27 @@ export function salesByMonth(orders, months = 6) {
     });
   return keys.map((k) => ({
     month: k,
-    label: new Date(`${k}-01T00:00:00`).toLocaleString('en-ZA', { month: 'short' }),
+    label: new Date(`${k}-01T00:00:00`).toLocaleString("en-ZA", {
+      month: "short",
+    }),
     total: sums.get(k).total,
     count: sums.get(k).count,
   }));
 }
 
 /** Revenue grouped by product category, from order items of non-cancelled orders. */
-export function salesByCategory(orders, orderItems, variants, products, categories) {
-  const okOrders = new Set(orders.filter((o) => ['confirmed', 'paid'].includes(o.status)).map((o) => o.id));
+export function salesByCategory(
+  orders,
+  orderItems,
+  variants,
+  products,
+  categories,
+) {
+  const okOrders = new Set(
+    orders
+      .filter((o) => ["confirmed", "paid"].includes(o.status))
+      .map((o) => o.id),
+  );
   const variantToProduct = new Map(variants.map((v) => [v.id, v.product_id]));
   const productToCat = new Map(products.map((p) => [p.id, p.category_id]));
   const catName = new Map(categories.map((c) => [c.id, c.name]));
@@ -92,7 +108,7 @@ export function salesByCategory(orders, orderItems, variants, products, categori
     .filter((i) => okOrders.has(i.order_id))
     .forEach((i) => {
       const cat = productToCat.get(variantToProduct.get(i.product_variant_id));
-      const name = catName.get(cat) || 'Uncategorised';
+      const name = catName.get(cat) || "Uncategorised";
       sums.set(name, (sums.get(name) || 0) + num(i.total_price));
     });
   return [...sums.entries()]
@@ -106,14 +122,25 @@ export function salesByCategory(orders, orderItems, variants, products, categori
  * - Creditors (we owe them): sent/partially_received/received POs minus payments out.
  * "paid" orders are settled and excluded.
  */
-export function partyBalances({ orders, purchaseOrders, payments, customers, suppliers }) {
+export function partyBalances({
+  orders,
+  purchaseOrders,
+  payments,
+  customers,
+  suppliers,
+}) {
   const debtors = customers
     .map((c) => {
       const invoiced = orders
-        .filter((o) => o.customer_id === c.id && o.status === 'confirmed')
+        .filter((o) => o.customer_id === c.id && o.status === "confirmed")
         .reduce((s, o) => s + num(o.total_amount), 0);
       const paid = payments
-        .filter((p) => p.party_kind === 'customer' && p.party_id === c.id && p.direction === 'in')
+        .filter(
+          (p) =>
+            p.party_kind === "customer" &&
+            p.party_id === c.id &&
+            p.direction === "in",
+        )
         .reduce((s, p) => s + num(p.amount), 0);
       return { party: c, balance: invoiced - paid, invoiced, paid };
     })
@@ -122,10 +149,19 @@ export function partyBalances({ orders, purchaseOrders, payments, customers, sup
   const creditors = suppliers
     .map((s) => {
       const billed = purchaseOrders
-        .filter((po) => po.supplier_id === s.id && ['sent', 'partially_received', 'received'].includes(po.status))
+        .filter(
+          (po) =>
+            po.supplier_id === s.id &&
+            ["sent", "partially_received", "received"].includes(po.status),
+        )
         .reduce((sum, po) => sum + num(po.total_amount), 0);
       const paid = payments
-        .filter((p) => p.party_kind === 'supplier' && p.party_id === s.id && p.direction === 'out')
+        .filter(
+          (p) =>
+            p.party_kind === "supplier" &&
+            p.party_id === s.id &&
+            p.direction === "out",
+        )
         .reduce((sum, p) => sum + num(p.amount), 0);
       return { party: s, balance: billed - paid, invoiced: billed, paid };
     })
@@ -149,21 +185,21 @@ export function movementLedger(movements, variants, products, branches) {
       const v = variantById.get(m.variant_id);
       return {
         ...m,
-        product: v ? productName.get(v.product_id) || '—' : '—',
+        product: v ? productName.get(v.product_id) || "—" : "—",
         variant: v?.name || m.variant_id,
-        sku: v?.sku || '',
+        sku: v?.sku || "",
         branch: branchName.get(m.branch_id) || m.branch_id,
       };
     })
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 }
 
 export const MOVEMENT_KIND_LABELS = {
-  receive: 'Goods received',
-  sale: 'Sale',
-  adjustment: 'Adjustment',
-  count: 'Stock count',
-  transfer_in: 'Transfer in',
-  transfer_out: 'Transfer out',
-  reversal: 'Reversal',
+  receive: "Goods received",
+  sale: "Sale",
+  adjustment: "Adjustment",
+  count: "Stock count",
+  transfer_in: "Transfer in",
+  transfer_out: "Transfer out",
+  reversal: "Reversal",
 };
