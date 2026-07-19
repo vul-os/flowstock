@@ -18,10 +18,15 @@ build-frontend:
 	npm run build
 
 # Tests
-test: test-go
+test: test-go test-e2e
 
 test-go:
 	go test ./backend/...
+
+# Browser end-to-end tests against the real binary (builds it if stale).
+# Needs `npx playwright install chromium` once.
+test-e2e:
+	npx playwright test
 
 lint:
 	npm run lint

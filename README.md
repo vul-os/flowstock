@@ -187,6 +187,7 @@ Vulos OS embedding). Business, branches and sync are configured in-app. See
 | [docs/SYNC.md](docs/SYNC.md)                       | topologies, security, merge semantics, conflict examples |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md)     | every setting + environment variables                    |
 | [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)         | regenerating the README screenshots                      |
+| [docs/TESTING.md](docs/TESTING.md)                 | Go and browser test suites, running and debugging them   |
 
 ## Development
 
@@ -197,6 +198,8 @@ npm run build          # frontend production build
 npm run build:all      # single embedded binary
 npm run lint           # eslint
 npm run test:go        # Go unit + HTTP sync e2e tests
+npm run test:e2e       # browser end-to-end tests (Playwright)
+npm test               # both suites
 npm run screenshots    # regenerate docs/screenshots (Playwright)
 ```
 
@@ -207,10 +210,35 @@ goods-receipt convergence, oplog compaction with snapshot rebuild, and the
 signed-batch tamper check, plus the store's merge/ledger invariants
 (`backend/internal/store/`).
 
+### Browser tests
+
+`npm run test:e2e` drives the **real binary** in a real browser — never the
+demo data. It builds the single embedded binary (skipped when already current),
+boots each instance against a throwaway data dir on a free port, and runs the
+flows a shopkeeper actually walks: adding a product and variant, recording
+stock, confirming an order, receiving a purchase order, and moving stock
+between branches.
+
+The centrepiece is a **two-node convergence test**: two separate processes with
+separate databases are paired through the Setup screen's "Join a branch" tab,
+edited while apart — including concurrent stock movements at the same branch —
+then synced, with convergence asserted in *both* browsers. A folder-sync test
+proves the same thing with the network peers deleted, so only the shared
+`ops-<node>.jsonl` files can carry the data.
+
+One-time browser install:
+
+```bash
+npx playwright install chromium
+```
+
+See [docs/TESTING.md](docs/TESTING.md) for the layout, how to debug a failure,
+and the conventions that keep the suite fast and non-flaky.
+
 ## Contributing
 
-Issues and PRs are welcome. Keep changes small and focused; run `npm run
-test:go` and `npm run lint` before submitting. For anything protocol-level
+Issues and PRs are welcome. Keep changes small and focused; run `npm test`
+(Go + browser) and `npm run lint` before submitting. For anything protocol-level
 (oplog, merge rules, sync endpoints), open an issue first — on-disk and on-wire
 compatibility matters.
 
