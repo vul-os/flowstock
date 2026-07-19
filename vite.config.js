@@ -10,7 +10,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Tauri expects a fixed dev port (see src-tauri/tauri.conf.json devUrl).
   server: {
     port: 5173,
     strictPort: true,
