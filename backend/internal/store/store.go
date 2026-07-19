@@ -22,6 +22,10 @@ import (
 // OrgID names the workspace that produced the op. It travels with every op so
 // data is self-describing: a node rejects ops from a different workspace even
 // if a shared sync secret happens to match (see ApplyOps).
+// Cose, when non-empty, is the op re-expressed as a DMTAP substrate SyncOp in a
+// COSE_Sign1 envelope (hex), minted and signed by the authoring node. It is
+// carried but ignored unless the substrate merge engine is enabled, so a node
+// running without it relays a neighbour's envelopes unchanged.
 type Op struct {
 	HLC     string          `json:"hlc"`
 	NodeID  string          `json:"node_id"`
@@ -30,6 +34,30 @@ type Op struct {
 	RowID   string          `json:"row_id"`
 	Deleted bool            `json:"deleted"`
 	Payload json.RawMessage `json:"payload"`
+	Cose    string          `json:"cose,omitempty"`
+}
+
+// Merger is an optional external merge authority: the DMTAP substrate sync
+// engine (substrate/SYNC.md §4). When one is installed the store stops deciding
+// conflicts itself — it journals and projects, and the engine's algebra decides
+// which write wins.
+//
+// It is a seam rather than a replacement so the hand-rolled engine below stays
+// the default and stays reachable: with no Merger installed, not one line of the
+// merge path changes.
+type Merger interface {
+	// Mint expresses a locally authored op as a signed SyncOp envelope (hex).
+	Mint(op Op) (string, error)
+	// Ingest records an op authored elsewhere, from its envelope. A refusal is
+	// an error: the engine fails closed rather than merging unverified state.
+	Ingest(op Op) error
+	// Resolve returns the winning payload for a row, the winner's HLC in
+	// FlowStock's string spelling, and whether the winner is a deletion. ok is
+	// false when the engine holds no opinion about that row.
+	Resolve(tbl, rowID string) (payload json.RawMessage, hlc string, deleted bool, ok bool)
+	// NoteLegacy records that an op arrived with no envelope, so a mixed-mode
+	// fleet is visible rather than silently half-merged by two algebras.
+	NoteLegacy()
 }
 
 // Store owns the database and the local clock. All methods are safe for
@@ -45,6 +73,17 @@ type Store struct {
 	// onChange fires after any committed local or remote mutation so the UI
 	// can refresh (wired to an SSE broadcaster in the api layer).
 	onChange func()
+	// merger, when set, is the substrate engine that decides conflicts. nil
+	// (the default) keeps the hand-rolled LWW/union path below.
+	merger Merger
+}
+
+// SetMerger installs an external merge authority. Passing nil restores the
+// built-in engine. Call it before serving traffic.
+func (s *Store) SetMerger(m Merger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.merger = m
 }
 
 // Open opens (or creates) the database at path and prepares the schema, node
@@ -233,7 +272,13 @@ func coerce(k colKind, v any) any {
 
 // writeRow upserts a row from an op payload inside tx. Mutable tables resolve
 // last-writer-wins on the hlc column; insert-only tables ignore conflicts.
-func writeRow(tx *sql.Tx, td tableDef, op Op) error {
+//
+// resolved reports that op already carries the merge authority's verdict for
+// this row rather than one candidate write, so the row is written
+// unconditionally: re-applying the SQL "greater hlc wins" guard on top would let
+// SQLite overrule the engine, which is precisely the second algebra installing
+// one is meant to remove.
+func writeRow(tx *sql.Tx, td tableDef, op Op, resolved bool) error {
 	var payload map[string]any
 	if len(op.Payload) > 0 {
 		_ = json.Unmarshal(op.Payload, &payload)
@@ -264,19 +309,49 @@ func writeRow(tx *sql.Tx, td tableDef, op Op) error {
 		for _, n := range names {
 			updates += fmt.Sprintf(", %s = excluded.%s", n, n)
 		}
+		guard := fmt.Sprintf(" WHERE excluded.hlc > %s.hlc", td.name)
+		if resolved {
+			guard = ""
+		}
 		stmt = fmt.Sprintf(`INSERT INTO %s (id, hlc, deleted, org_id%s) VALUES (?, ?, ?, ?%s)
-			ON CONFLICT(id) DO UPDATE SET %s WHERE excluded.hlc > %s.hlc`,
-			td.name, colList, valList, updates, td.name)
+			ON CONFLICT(id) DO UPDATE SET %s%s`,
+			td.name, colList, valList, updates, guard)
 	}
 	_, err := tx.Exec(stmt, args...)
 	return err
 }
 
+// resolveWrite asks the merge authority what the row should now contain, given
+// that op has just been admitted. It returns the op to project and whether that
+// projection is authoritative.
+//
+// Insert-only ledgers are returned unresolved on purpose: their merge is set
+// union, and "INSERT OR IGNORE" already computes exactly that, so there is
+// nothing for the engine to overrule. The engine still holds every movement as
+// an OR-Set element — that is what makes its state root a check on the ledger
+// rather than a restatement of it.
+func (s *Store) resolveWrite(td tableDef, op Op) (Op, bool) {
+	if td.insertOnly {
+		return op, false
+	}
+	payload, hlc, deleted, ok := s.merger.Resolve(op.Tbl, op.RowID)
+	if !ok {
+		return op, false
+	}
+	win := op
+	win.Payload = payload
+	win.Deleted = deleted
+	if hlc != "" {
+		win.HLC = hlc
+	}
+	return win, true
+}
+
 func appendOplog(tx *sql.Tx, op Op) (bool, error) {
 	res, err := tx.Exec(
-		`INSERT OR IGNORE INTO oplog (hlc, node_id, org_id, tbl, row_id, deleted, payload)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		op.HLC, op.NodeID, op.OrgID, op.Tbl, op.RowID, boolToInt(op.Deleted), string(op.Payload))
+		`INSERT OR IGNORE INTO oplog (hlc, node_id, org_id, tbl, row_id, deleted, payload, cose)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		op.HLC, op.NodeID, op.OrgID, op.Tbl, op.RowID, boolToInt(op.Deleted), string(op.Payload), op.Cose)
 	if err != nil {
 		return false, err
 	}
@@ -303,11 +378,27 @@ func (s *Store) LocalPut(tbl, rowID string, payload map[string]any, deleted bool
 	}
 	op := Op{HLC: s.clock.Tick(), NodeID: s.nodeID, OrgID: s.orgID, Tbl: tbl, RowID: rowID, Deleted: deleted, Payload: raw}
 
+	// With a merge authority installed, the op is expressed as a signed SyncOp
+	// and admitted to the engine before it reaches SQLite, so what lands in the
+	// row is the engine's verdict rather than this write taken on trust. A
+	// signing or admission failure aborts the mutation: journalling a write the
+	// engine would not accept is how the two states drift apart.
+	write := op
+	resolved := false
+	if s.merger != nil {
+		cose, err := s.merger.Mint(op)
+		if err != nil {
+			return Op{}, fmt.Errorf("substrate mint: %w", err)
+		}
+		op.Cose = cose
+		write, resolved = s.resolveWrite(td, op)
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return Op{}, err
 	}
-	if err := writeRow(tx, td, op); err != nil {
+	if err := writeRow(tx, td, write, resolved); err != nil {
 		tx.Rollback()
 		return Op{}, err
 	}
@@ -327,12 +418,42 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Admission runs to completion before the transaction opens, for two
+	// reasons. The engine may need to read this database (to check which key a
+	// node enrolled), and the connection pool is one connection wide — asking it
+	// inside a transaction deadlocks. And admitting the whole batch first means
+	// the verdict each row is written from is the batch's final winner rather
+	// than an intermediate one.
+	admitted := make([]bool, len(ops))
+	if s.merger != nil {
+		for i, op := range ops {
+			if _, ok := tableByName(op.Tbl); !ok {
+				continue
+			}
+			if op.OrgID != "" && op.OrgID != s.orgID {
+				continue
+			}
+			if op.Cose == "" {
+				// A peer that has not enabled the substrate engine. Merged by
+				// the built-in algebra and counted, because a fleet running two
+				// algebras at once is a condition an operator must be able to
+				// see.
+				s.merger.NoteLegacy()
+				continue
+			}
+			if err := s.merger.Ingest(op); err != nil {
+				return 0, fmt.Errorf("substrate ingest %s: %w", op.HLC, err)
+			}
+			admitted[i] = true
+		}
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	fresh := 0
-	for _, op := range ops {
+	for i, op := range ops {
 		td, ok := tableByName(op.Tbl)
 		if !ok {
 			continue
@@ -343,13 +464,18 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 		if op.OrgID != "" && op.OrgID != s.orgID {
 			continue
 		}
+		write := op
+		resolved := false
+		if admitted[i] {
+			write, resolved = s.resolveWrite(td, op)
+		}
 		isNew, err := appendOplog(tx, op)
 		if err != nil {
 			tx.Rollback()
 			return 0, err
 		}
 		if isNew {
-			if err := writeRow(tx, td, op); err != nil {
+			if err := writeRow(tx, td, write, resolved); err != nil {
 				tx.Rollback()
 				return 0, err
 			}
@@ -428,7 +554,7 @@ func (s *Store) mergeSnapshotFloor(add map[string]string) error {
 // up to limit.
 func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error) {
 	rows, err := s.db.Query(
-		"SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload FROM oplog ORDER BY hlc ASC")
+		"SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload, cose FROM oplog ORDER BY hlc ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +564,7 @@ func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error
 		var op Op
 		var del int
 		var payload string
-		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload); err != nil {
+		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload, &op.Cose); err != nil {
 			return nil, err
 		}
 		op.Deleted = del != 0
@@ -460,7 +586,7 @@ func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error
 // and file-sync tools (Dropbox/Syncthing/NAS) never see a conflict.
 func (s *Store) OwnOpsAfter(afterHLC string) ([]Op, error) {
 	rows, err := s.db.Query(
-		`SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload FROM oplog
+		`SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload, cose FROM oplog
 		 WHERE node_id = ? AND hlc > ? ORDER BY hlc ASC`, s.nodeID, afterHLC)
 	if err != nil {
 		return nil, err
@@ -471,7 +597,7 @@ func (s *Store) OwnOpsAfter(afterHLC string) ([]Op, error) {
 		var op Op
 		var del int
 		var payload string
-		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload); err != nil {
+		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload, &op.Cose); err != nil {
 			return nil, err
 		}
 		op.Deleted = del != 0

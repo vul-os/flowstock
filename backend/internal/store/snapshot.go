@@ -181,7 +181,11 @@ func (s *Store) ImportSnapshot(snap *Snapshot) (int, error) {
 			}
 			raw, _ := json.Marshal(payload)
 			op.Payload = raw
-			if err := writeRow(tx, td, op); err != nil {
+			// Snapshot rows carry their own hlc and are merged by the same
+			// last-writer-wins guard as an op, so the import stays unresolved
+			// even under a substrate merger: a snapshot is state, and the
+			// engine's state is rebuilt from ops, not imported (§6.1.2).
+			if err := writeRow(tx, td, op, false); err != nil {
 				tx.Rollback()
 				return 0, err
 			}

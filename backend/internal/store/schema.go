@@ -73,6 +73,14 @@ func tableByName(name string) (tableDef, bool) {
 	return tableDef{}, false
 }
 
+// IsInsertOnly reports whether a synced table is an immutable append-only
+// ledger (stock_movements, po_receipts) that merges by set union rather than
+// last-writer-wins. It is the table property the substrate mapping keys off.
+func IsInsertOnly(name string) bool {
+	td, ok := tableByName(name)
+	return ok && td.insertOnly
+}
+
 // SyncedTables returns the names of all tables that participate in sync.
 func SyncedTables() []string {
 	out := make([]string, len(tables))
@@ -137,7 +145,8 @@ func initSchema(db *sql.DB) error {
 			tbl TEXT NOT NULL,
 			row_id TEXT NOT NULL,
 			deleted INTEGER NOT NULL DEFAULT 0,
-			payload TEXT NOT NULL
+			payload TEXT NOT NULL,
+			cose TEXT NOT NULL DEFAULT ''
 		);
 		CREATE INDEX IF NOT EXISTS idx_oplog_node ON oplog(node_id, hlc);
 
@@ -165,6 +174,9 @@ func initSchema(db *sql.DB) error {
 	// columns to an existing table). node_id lets a peer row be looked up by the
 	// remote node's identity, which is how inbound requests are authenticated
 	// against a recorded Ed25519 key (see sync transport auth).
+	if err := addColumnIfMissing(db, "oplog", "cose", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 	for _, c := range []struct{ col, decl string }{
 		{"vector", "TEXT NOT NULL DEFAULT ''"},
 		{"pubkey", "TEXT NOT NULL DEFAULT ''"},

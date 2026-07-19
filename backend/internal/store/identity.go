@@ -10,6 +10,7 @@ package store
 // of a shared secret) is a documented next step, not forced here.
 
 import (
+	"crypto"
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/hex"
@@ -79,4 +80,19 @@ func VerifySig(pubHex string, msg []byte, sigHex string) bool {
 		return false
 	}
 	return ed25519.Verify(ed25519.PublicKey(pub), msg, sig)
+}
+
+// CryptoSigner exposes this node's identity as a crypto.Signer — a custodian
+// that answers signature requests without surrendering the key.
+//
+// It is the shape the substrate sync binding takes (dmtapsync.CryptoSigner), and
+// deliberately the only shape: that binding accepts no key material at all, so
+// FlowStock hands out signatures rather than a seed. Today the custodian is an
+// in-process ed25519.PrivateKey; moving it to an HSM or agent later is a change
+// here and at no call site.
+func (s *Store) CryptoSigner() (crypto.Signer, bool) {
+	if s.priv == nil {
+		return nil, false
+	}
+	return s.priv, true
 }

@@ -1,8 +1,11 @@
 module flowstock
 
-go 1.25
+go 1.25.0
 
-require modernc.org/sqlite v1.34.5
+require (
+	github.com/vul-os/envoir/bindings/go v0.0.0
+	modernc.org/sqlite v1.34.5
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -10,8 +13,14 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	github.com/tetratelabs/wazero v1.12.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	modernc.org/libc v1.55.3 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 )
+
+// The DMTAP Sync engine is vendored, not fetched: its embedded .wasm is build
+// output that is gitignored upstream, so a proxy-fetched module does not compile.
+// See third_party/dmtapsync/VENDOR.md.
+replace github.com/vul-os/envoir/bindings/go => ./third_party/dmtapsync
