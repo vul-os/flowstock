@@ -68,6 +68,9 @@ export class FlowStockNode {
         FLOWSTOCK_DATA_DIR: dataDir,
         FLOWSTOCK_PORT: String(port),
         FLOWSTOCK_HOST: "127.0.0.1",
+        // Per-node environment, for the flags a test needs to set on the real
+        // process rather than simulate (FLOWSTOCK_SUBSTRATE_SYNC).
+        ...(opts.env || {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -181,6 +184,15 @@ export class FlowStockNode {
 
   syncSettings() {
     return this.req("GET", "/api/sync/settings");
+  }
+
+  /**
+   * The shared sync engine's status, including `state_root` — the content
+   * address of this replica's whole observable state (SYNC.md §6.1). Two
+   * converged branches agree on it byte for byte.
+   */
+  substrate() {
+    return this.req("GET", "/api/substrate");
   }
 
   setSyncSettings(patch) {
