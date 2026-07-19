@@ -1,72 +1,197 @@
+/* ------------------------------------------------------------------
+ * FlowStock — "Kraft & Signal" design system
+ *
+ * The warehouse floor, digitized. Warm manila/kraft neutrals instead of
+ * generic cool slate; a deep teal "flow" primary for movement and logistics;
+ * an amber signal accent reserved for things that need a human to look.
+ * Numerics ride on a monospace data face so ledger columns line up.
+ *
+ * Type: Archivo (industrial grotesque, display + UI) + IBM Plex Mono (data).
+ * Both self-hosted via @fontsource — no runtime CDN.
+ * ------------------------------------------------------------------ */
+
+@import '@fontsource-variable/archivo/index.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
+    /* ---- raw palette scales (HSL triples) ------------------------- */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Kraft — warm manila paper neutrals */
+    --kraft-50: 45 55% 98.5%;
+    --kraft-100: 42 44% 96%;
+    --kraft-200: 38 26% 91%;
+    --kraft-300: 36 20% 84%;
+    --kraft-400: 34 22% 50%;
+    --kraft-500: 32 12% 46%;
+    --kraft-600: 30 10% 38%;
+    --kraft-700: 30 12% 26%;
+    --kraft-800: 28 14% 18%;
+    --kraft-900: 28 18% 13%;
+    --kraft-950: 30 11% 8%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
+    /* Flow — deep teal, movement + logistics (deliberately not AI-purple,
+       and far enough from semantic green to never read as "success") */
+    --flow-50: 186 55% 96%;
+    --flow-100: 186 50% 90%;
+    --flow-200: 186 48% 80%;
+    --flow-300: 185 46% 66%;
+    --flow-400: 184 62% 54%;
+    --flow-500: 186 68% 38%;
+    --flow-600: 187 76% 26%;
+    --flow-700: 188 78% 21%;
+    --flow-800: 189 76% 16%;
+    --flow-900: 190 80% 11%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    /* Signal — amber, reserved for attention (low stock, pending, unsynced) */
+    --signal-100: 42 92% 92%;
+    --signal-200: 40 92% 80%;
+    --signal-300: 38 92% 66%;
+    --signal-400: 38 92% 58%;
+    --signal-500: 36 92% 45%;
+    --signal-600: 30 88% 30%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    /* ---- semantic tokens: LIGHT (kraft paper under warehouse light) --- */
+    --background: var(--kraft-100);
+    --foreground: var(--kraft-900);
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --card: var(--kraft-50);
+    --card-foreground: var(--kraft-900);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --popover: var(--kraft-50);
+    --popover-foreground: var(--kraft-900);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: var(--kraft-200);
+    --muted-foreground: var(--kraft-600);
 
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --border: var(--kraft-300);
+    /* form controls need a 3:1 boundary, decorative rules do not */
+    --input: var(--kraft-400);
 
-    --ring: 215 20.2% 65.1%;
+    --primary: var(--flow-600);
+    --primary-foreground: var(--kraft-50);
+    --primary-muted: 186 55% 92%;
 
+    --secondary: var(--kraft-200);
+    --secondary-foreground: var(--kraft-900);
+
+    /* `accent` stays a neutral hover wash — shadcn uses it for menu/row hover.
+       The amber signal lives on its own tokens so it is never accidental. */
+    --accent: var(--kraft-200);
+    --accent-foreground: var(--kraft-900);
+
+    --signal: var(--signal-500);
+    --signal-foreground: 28 40% 12%;
+    /* amber fails AA as text on paper, so text gets a darkened ramp step */
+    --signal-text: var(--signal-600);
+    --signal-muted: var(--signal-100);
+
+    --destructive: 4 68% 42%;
+    --destructive-foreground: var(--kraft-50);
+    --destructive-muted: 4 70% 94%;
+
+    --success: 152 62% 26%;
+    --success-foreground: var(--kraft-50);
+    --success-muted: 152 45% 92%;
+
+    --ring: var(--flow-500);
+
+    /* ---- radii ---------------------------------------------------- */
     --radius: 0.5rem;
+    --radius-sm: 0.25rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    /* ---- elevation: warm-tinted, never pure black ------------------ */
+    --shadow-color: 28 25% 12%;
+    --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.07);
+    --shadow-sm:
+      0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 1px 3px 0 hsl(var(--shadow-color) / 0.08);
+    --shadow-md:
+      0 2px 4px -1px hsl(var(--shadow-color) / 0.07), 0 4px 10px -2px hsl(var(--shadow-color) / 0.1);
+    --shadow-lg:
+      0 4px 8px -2px hsl(var(--shadow-color) / 0.08),
+      0 12px 28px -6px hsl(var(--shadow-color) / 0.14);
+    --shadow-xl: 0 24px 56px -12px hsl(var(--shadow-color) / 0.22);
+
+    /* ---- motion: short, mechanical, never bouncy ------------------- */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-fast: 110ms;
+    --duration-base: 170ms;
+    --duration-slow: 280ms;
+
+    /* ---- density ramp (ops tables run tighter than marketing UI) --- */
+    --density-row-h: 2.5rem;
+    --density-row-px: 0.75rem;
+    --density-control-h: 2.25rem;
+
+    /* ---- type ------------------------------------------------------ */
+    --font-sans:
+      'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue',
+      Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    /* ---- semantic tokens: DARK (warehouse after hours — warm charcoal,
+       not blue-black; the kraft hue survives into the dark theme) ----- */
+    --background: var(--kraft-950);
+    --foreground: 40 26% 92%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --card: 30 10% 11%;
+    --card-foreground: 40 26% 92%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
+    --popover: 30 10% 12%;
+    --popover-foreground: 40 26% 92%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
+    --muted: 30 9% 16%;
+    --muted-foreground: 36 12% 68%;
 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
+    --border: 30 9% 21%;
+    --input: 30 10% 42%;
 
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
+    --primary: var(--flow-400);
+    --primary-foreground: var(--flow-900);
+    --primary-muted: 187 45% 17%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
+    --secondary: 30 9% 16%;
+    --secondary-foreground: 40 26% 92%;
 
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
+    --accent: 30 9% 18%;
+    --accent-foreground: 40 26% 92%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --signal: var(--signal-400);
+    --signal-foreground: 30 60% 8%;
+    /* on charcoal the amber already clears AA, so text uses the true signal */
+    --signal-text: var(--signal-300);
+    --signal-muted: 36 45% 15%;
 
-    --ring: 216 34% 17%;
+    --destructive: 4 72% 60%;
+    --destructive-foreground: 20 40% 8%;
+    --destructive-muted: 4 40% 17%;
 
-    --radius: 0.5rem;
+    --success: 152 52% 52%;
+    --success-foreground: 152 60% 8%;
+    --success-muted: 152 35% 14%;
+
+    --ring: var(--flow-400);
+
+    --shadow-color: 0 0% 0%;
+    --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.4);
+    --shadow-sm:
+      0 1px 2px 0 hsl(var(--shadow-color) / 0.4), 0 1px 3px 0 hsl(var(--shadow-color) / 0.5);
+    --shadow-md:
+      0 2px 4px -1px hsl(var(--shadow-color) / 0.5), 0 4px 10px -2px hsl(var(--shadow-color) / 0.55);
+    --shadow-lg:
+      0 4px 8px -2px hsl(var(--shadow-color) / 0.5), 0 12px 28px -6px hsl(var(--shadow-color) / 0.6);
+    --shadow-xl: 0 24px 56px -12px hsl(var(--shadow-color) / 0.7);
   }
 }
 
@@ -74,8 +199,239 @@
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Kraft grain: a barely-there paper tooth so large surfaces are not flat.
+     Pure CSS, no image request. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image:
+      radial-gradient(hsl(var(--kraft-700) / 0.035) 0.5px, transparent 0.5px),
+      radial-gradient(hsl(var(--kraft-700) / 0.025) 0.5px, transparent 0.5px);
+    background-size:
+      14px 14px,
+      9px 9px;
+    background-position:
+      0 0,
+      4px 6px;
+  }
+
+  .dark body::before {
+    opacity: 0.35;
+    background-image:
+      radial-gradient(hsl(45 40% 80% / 0.02) 0.5px, transparent 0.5px),
+      radial-gradient(hsl(45 40% 80% / 0.015) 0.5px, transparent 0.5px);
+  }
+
+  /* ---- typographic scale: tight, industrial ----------------------- */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+
+  /* ---- one focus treatment, everywhere ---------------------------- */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Numerals: lining + tabular by default so ledger columns align */
+  input[type='number'],
+  td,
+  th {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.24);
+  }
+
+  /* Warm, thin scrollbars that read as part of the surface */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* ---- data face -------------------------------------------------- */
+
+  /* Any ledger figure, SKU, ID, quantity or money value. */
+  .data-figure {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'zero' 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* Right-aligned numeric table cell — the ops-table default. */
+  .cell-num {
+    @apply text-right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'zero' 1;
+  }
+
+  /* Identifiers: SKUs, order numbers, peer fingerprints. */
+  .code-chip {
+    @apply inline-flex items-center rounded-sm px-1.5 py-0.5 text-[0.8125rem];
+    font-family: var(--font-mono);
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* ---- section furniture ------------------------------------------ */
+
+  /* Stencilled label — the crate-marking voice used above groups. */
+  .stencil-label {
+    @apply text-[0.6875rem] font-semibold uppercase;
+    font-family: var(--font-mono);
+    letter-spacing: 0.14em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .page-title {
+    @apply text-2xl font-bold tracking-tight md:text-[1.75rem];
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm text-muted-foreground;
+  }
+
+  /* ---- state surfaces: empty / loading / error, one look each ------ */
+
+  .state-panel {
+    @apply flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-14 text-center;
+    background: hsl(var(--muted) / 0.35);
+  }
+
+  .state-panel-icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-full;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+  }
+
+  .state-panel-title {
+    @apply text-sm font-semibold text-foreground;
+  }
+
+  .state-panel-body {
+    @apply max-w-sm text-sm text-muted-foreground;
+  }
+
+  .state-panel--error {
+    border-style: solid;
+    border-color: hsl(var(--destructive) / 0.4);
+    background: hsl(var(--destructive-muted) / 0.6);
+  }
+
+  /* Skeleton shimmer, kraft-tinted. */
+  .skeleton {
+    @apply rounded-md;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.12) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.5s var(--ease-in-out) infinite;
+  }
+
+  /* ---- signal (amber) surfaces ------------------------------------ */
+
+  .signal-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium;
+    background: hsl(var(--signal-muted));
+    color: hsl(var(--signal-text));
+  }
+
+  /* A left rule in the accent colour — used to mark rows needing action. */
+  .flow-rule {
+    box-shadow: inset 3px 0 0 0 hsl(var(--primary));
+  }
+
+  .signal-rule {
+    box-shadow: inset 3px 0 0 0 hsl(var(--signal));
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .shadow-token-sm {
+    box-shadow: var(--shadow-sm);
+  }
+  .shadow-token-md {
+    box-shadow: var(--shadow-md);
+  }
+  .shadow-token-lg {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@keyframes skeleton-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
