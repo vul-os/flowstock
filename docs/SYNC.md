@@ -211,6 +211,43 @@ Public keys are exchanged in the sync handshake and recorded against each peer
 (`peers.pubkey`, keyed to the remote `node_id`) on pairing — the same recorded
 key that inbound requests are then verified against.
 
+## The shared substrate engine
+
+FlowStock's merge rules — last-writer-wins for catalog rows, union for the
+ledgers — were written for FlowStock. The Vulos suite now has one specified
+implementation of those rules that several products share, and FlowStock can use
+it instead: set `substrate_sync` (see [Configuration](CONFIGURATION.md)). It is
+off by default and the built-in engine is untouched.
+
+Nothing about the deployment changes. Storage is still SQLite, transport is
+still the mutual-Ed25519 HTTP pull and the folder-sync path, and the per-node
+key is still the per-node key — it simply becomes the signing key for each op as
+well, so every replicated change is individually signed and verified rather than
+trusted because it arrived over an authenticated connection.
+
+What the mapping says, in FlowStock's terms:
+
+| FlowStock                            | Substrate                     | Why                                                                                                                        |
+| ------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| a catalog row (product, customer, …) | one last-writer-wins register | matches what FlowStock already does: the newest write replaces the row                                                     |
+| deleting a catalog row               | an ordinary write, flagged    | FlowStock re-creates a deleted row with the same write that created it, so the deletion must not be permanent in the merge |
+| `stock_movements`, `po_receipts`     | an add-only set               | immutable facts, summed at read time — concurrent movements union rather than clobber                                      |
+
+The second row is the one worth understanding. The substrate offers a stronger
+kind of delete that no later edit can undo, meant for redactions and expiries.
+Using it here would look correct in every test that only ever deletes — and
+would then swallow the next write to that row on every branch at once, with no
+error anywhere. FlowStock does not use it, and an end-to-end test deletes a
+product and re-creates it to keep that true.
+
+### Checking that two branches really agree
+
+With the engine on, `GET /api/substrate` returns a `state_root`: a content
+address over the whole replicated state, including tombstones and other things
+no screen shows. Two branches that have converged return byte-identical roots.
+Comparing screens tells you the visible part matches; comparing roots tells you
+everything matches.
+
 ## Conflict examples
 
 | Scenario                                   | Outcome                                                 |

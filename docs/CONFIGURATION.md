@@ -26,8 +26,31 @@ resolve in the order **config file → environment variable → default**.
 | `password`             | `FLOWSTOCK_PASSWORD`             | _(empty)_      | if set, gates the app + data API behind an owner password                                                                                                                                                                                                                              |
 | `frame_ancestors`      | `FLOWSTOCK_FRAME_ANCESTORS`      | _(empty)_      | origins allowed to iframe FlowStock, e.g. `https://vulos.org` (for the Vulos OS shell)                                                                                                                                                                                                 |
 | `sync_secret_fallback` | `FLOWSTOCK_SYNC_SECRET_FALLBACK` | `false`        | when `true`, lets an already-enrolled sync peer authenticate with the shared secret alone instead of a request signature — a compatibility escape hatch for mixed-version fleets. Default `false` = mutual key auth is required once a peer has enrolled a key (the mesh fails closed) |
+| `substrate_sync`       | `FLOWSTOCK_SUBSTRATE_SYNC`       | `false`        | when `true`, the shared DMTAP sync engine decides how concurrent writes merge instead of FlowStock's own CRDT. **Set it on every node in a workspace or on none** — see below                                                                                                          |
 
 The `--port` flag overrides the port; `--version` prints the version.
+
+### `substrate_sync` — the shared merge engine
+
+FlowStock can merge with the suite-wide [DMTAP sync engine](SYNC.md#the-shared-substrate-engine)
+instead of its own hand-rolled CRDT. Storage, transport and identity are
+unchanged; only the algebra that decides a conflict changes.
+
+**It is a deployment-wide switch, not a per-node preference.** Both engines
+converge, but they do not share a total order: FlowStock breaks a tie between
+two writes stamped in the same millisecond on the node id, the substrate on the
+author's public key. A mesh running both can therefore pick different winners
+for the same pair of concurrent writes. Turn it on everywhere or nowhere.
+
+Ops from a peer that has not switched still merge, but they are counted:
+`GET /api/substrate` reports `legacy_ops`, and a non-zero value means the
+rollout is half-done. That endpoint also returns `state_root` — a content
+address over this branch's entire replicated state. Two branches that have
+converged return the identical 66-character root, which is a far stronger check
+than comparing what the two screens show.
+
+The engine costs about 3.6 MB of binary size and ~120 ms at first start
+(~6 ms afterwards, from a compiled-code cache under the data dir).
 
 ## In-app settings (Settings page)
 

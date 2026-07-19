@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional shared sync engine** (`substrate_sync`, default off): the
+  suite-wide DMTAP sync engine can decide how concurrent writes merge instead
+  of FlowStock's own CRDT. Storage, transport and identity are unchanged; the
+  per-node Ed25519 key additionally signs every op, so replicated changes are
+  individually verified rather than trusted for arriving over an authenticated
+  connection. `GET /api/substrate` reports a `state_root` — a content address
+  over the whole replicated state — so two branches can be checked for
+  agreement over everything, not just what is on screen. It is a
+  deployment-wide switch: both engines converge, but they break an exact
+  timestamp tie differently, so a workspace must run one or the other.
+
 - **Self-describing workspaces**: every synced row and op carries an `org_id`
   (generated on first run). Cross-workspace ops are rejected on apply and a
   peer that reports a different workspace is refused, so isolation no longer
