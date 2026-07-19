@@ -53,15 +53,15 @@ prebuilt binary (CI builds it as its own step).
 
 ### What is covered
 
-| Spec | What it proves |
-| --- | --- |
-| `catalog.spec.js` | Creating a product and a variant through the UI, persisted to SQLite and surviving reload |
-| `stock.spec.js` | A recorded movement updates stock on hand and appears in the ledger; a transfer writes paired out/in movements sharing one `ref_id` |
-| `orders.spec.js` | Confirming a sales order deducts stock via a `sale` movement; receiving a purchase order twice appends two `po_receipts` rows summing to the total, with `received_quantity` derived at read time and over-receipt refused |
-| `setup-pairing.spec.js` | First run creates a workspace; a second device joins using the secret shown in the first device's Settings — entirely through the browser, no API calls |
-| `sync-two-node.spec.js` | **The core claim.** Two processes, two databases, divergent offline edits, then convergence asserted in both UIs. Includes concurrent movements at the *same* branch, which must union-merge rather than clobber, and an unreachable-peer round that delivers once the peer returns |
-| `folder-sync.spec.js` | The zero-infrastructure path: with all network peers deleted, two nodes converge purely through `ops-<node>.jsonl` files in a shared folder, idempotently |
-| `ui-guards.spec.js` | Every route renders in **both** themes with readable headings (computed WCAG contrast against the real backdrop), a clean console, and working navigation |
+| Spec                    | What it proves                                                                                                                                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalog.spec.js`       | Creating a product and a variant through the UI, persisted to SQLite and surviving reload                                                                                                                                                                                           |
+| `stock.spec.js`         | A recorded movement updates stock on hand and appears in the ledger; a transfer writes paired out/in movements sharing one `ref_id`                                                                                                                                                 |
+| `orders.spec.js`        | Confirming a sales order deducts stock via a `sale` movement; receiving a purchase order twice appends two `po_receipts` rows summing to the total, with `received_quantity` derived at read time and over-receipt refused                                                          |
+| `setup-pairing.spec.js` | First run creates a workspace; a second device joins using the secret shown in the first device's Settings — entirely through the browser, no API calls                                                                                                                             |
+| `sync-two-node.spec.js` | **The core claim.** Two processes, two databases, divergent offline edits, then convergence asserted in both UIs. Includes concurrent movements at the _same_ branch, which must union-merge rather than clobber, and an unreachable-peer round that delivers once the peer returns |
+| `folder-sync.spec.js`   | The zero-infrastructure path: with all network peers deleted, two nodes converge purely through `ops-<node>.jsonl` files in a shared folder, idempotently                                                                                                                           |
+| `ui-guards.spec.js`     | Every route renders in **both** themes with readable headings (computed WCAG contrast against the real backdrop), a clean console, and working navigation                                                                                                                           |
 
 ### Conventions
 
@@ -76,7 +76,7 @@ prebuilt binary (CI builds it as its own step).
 - **Scope table assertions.** `/stock` renders two tables (stock on hand, then
   the movement ledger) and both mention the SKU.
 - **Status text is lowercase in the DOM** (`draft`, `confirmed`, `partially
-  received`) — the capitalisation is CSS only.
+received`) — the capitalisation is CSS only.
 - Selects are Radix, not native: click the trigger, then the option (there is a
   `chooseOption` helper). Options are portalled to `body`, so scope option
   clicks to the page, not the dialog.

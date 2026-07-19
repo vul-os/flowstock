@@ -70,7 +70,7 @@ random `nonce`. The responder:
 1. checks the timestamp is **fresh** (within ±5 minutes) — rejects stale or
    future-dated requests;
 2. looks up the **public key it recorded** for the caller's node id and verifies
-   the signature against *that* key (never the one the caller presents) — so a
+   the signature against _that_ key (never the one the caller presents) — so a
    caller cannot impersonate an enrolled node by presenting its own key;
 3. rejects a **replayed** `(node, nonce)` it has seen inside the freshness
    window.
@@ -82,26 +82,26 @@ The shared secret now has exactly two jobs:
 - **Pairing bootstrap.** A node that has not yet enrolled a key proves it knows
   the secret; that authorizes the responder to record (trust-on-first-use) the
   key it presents. From then on the node authenticates **by key** and the secret
-  is no longer consulted for it. This is how a new branch *earns* enrollment.
+  is no longer consulted for it. This is how a new branch _earns_ enrollment.
 - **Compatibility fallback** (opt-in). With `sync_secret_fallback` enabled
   (default **off**), an already-enrolled peer may still authenticate with the
   secret alone. With the default off, an enrolled peer that presents no valid
   signature is **rejected — the mesh fails closed.**
 
-With no secret set *and* no enrolled key, every request is rejected (401).
+With no secret set _and_ no enrolled key, every request is rejected (401).
 
 ### Threat model
 
-| Threat | What stops it |
-|---|---|
-| A stranger on the network reaching the sync API | They have neither the shared secret (to bootstrap) nor an enrolled key → rejected. |
-| A former branch whose key you removed | Its key no longer verifies. It can only re-enroll if it still knows the shared secret — so full revocation = **remove the peer row *and* rotate the secret**. |
-| Someone who learns the shared secret | They can bootstrap-enroll a *new* key, but cannot forge requests as an *existing* enrolled node (those verify against the recorded key). Rotate the secret to stop new enrollments. |
-| A captured request replayed later | Fails the freshness window and/or the replay-nonce cache. |
-| A tampered request body / retargeted path | The body hash and path are inside the signed envelope → signature fails. |
-| Two unrelated businesses sharing a secret by accident | `org_id` isolation rejects foreign ops regardless of transport auth (see Workspaces above). |
+| Threat                                                | What stops it                                                                                                                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A stranger on the network reaching the sync API       | They have neither the shared secret (to bootstrap) nor an enrolled key → rejected.                                                                                                  |
+| A former branch whose key you removed                 | Its key no longer verifies. It can only re-enroll if it still knows the shared secret — so full revocation = **remove the peer row _and_ rotate the secret**.                       |
+| Someone who learns the shared secret                  | They can bootstrap-enroll a _new_ key, but cannot forge requests as an _existing_ enrolled node (those verify against the recorded key). Rotate the secret to stop new enrollments. |
+| A captured request replayed later                     | Fails the freshness window and/or the replay-nonce cache.                                                                                                                           |
+| A tampered request body / retargeted path             | The body hash and path are inside the signed envelope → signature fails.                                                                                                            |
+| Two unrelated businesses sharing a secret by accident | `org_id` isolation rejects foreign ops regardless of transport auth (see Workspaces above).                                                                                         |
 
-**What the shared secret still protects:** the *bootstrap* step — only someone
+**What the shared secret still protects:** the _bootstrap_ step — only someone
 with the secret can get a key enrolled. **What key auth adds on top:** per-node
 identity, non-repudiation, replay protection, and revocation that does not
 require re-keying everyone (remove one peer row).
@@ -109,7 +109,7 @@ require re-keying everyone (remove one peer row).
 ### Revocation
 
 Deleting a peer row removes its recorded key, so that node can no longer
-authenticate by key. A node that paired *inbound* (dialed you) appears in
+authenticate by key. A node that paired _inbound_ (dialed you) appears in
 **Settings → Sync → Peers** badged **inbound** with no dial URL; removing it
 revokes it. Because a node that still knows the shared secret could re-bootstrap
 a fresh key, rotate the secret alongside removal to revoke completely.
@@ -128,9 +128,9 @@ a fresh key, rotate the secret alongside removal to revoke completely.
 
 ### Independence first
 
-FlowStock never *needs* the internet or any Vulos service to sync. A LAN, a
+FlowStock never _needs_ the internet or any Vulos service to sync. A LAN, a
 VPN/overlay you run yourself, or the folder transport below are all first-class.
-A **Vulos Relay** tunnel is only ever an *optional convenience* for reaching a
+A **Vulos Relay** tunnel is only ever an _optional convenience_ for reaching a
 branch across the internet without opening a port — nothing about sync depends
 on it.
 
@@ -204,7 +204,7 @@ double duty:
 
 - it signs the **op batches** a node pushes and the **snapshots** it writes, so
   replicated data is attributable and **tamper-evident**; and
-- it signs every **sync request** (see *Transport & security* above), which is
+- it signs every **sync request** (see _Transport & security_ above), which is
   how the mutual key authentication works.
 
 Public keys are exchanged in the sync handshake and recorded against each peer
@@ -213,12 +213,12 @@ key that inbound requests are then verified against.
 
 ## Conflict examples
 
-| Scenario | Outcome |
-|---|---|
-| JHB and CPT both sell SKU X while offline | Both sale movements survive; total stock reflects both |
-| Both edit the same product's price offline | Newest edit wins everywhere (LWW) |
-| JHB cancels an order CPT already synced | Cancellation + stock reversal replicate |
-| A branch is offline for a month | First reconnect replays everything both ways in batches |
+| Scenario                                   | Outcome                                                 |
+| ------------------------------------------ | ------------------------------------------------------- |
+| JHB and CPT both sell SKU X while offline  | Both sale movements survive; total stock reflects both  |
+| Both edit the same product's price offline | Newest edit wins everywhere (LWW)                       |
+| JHB cancels an order CPT already synced    | Cancellation + stock reversal replicate                 |
+| A branch is offline for a month            | First reconnect replays everything both ways in batches |
 
 ## Operational notes
 

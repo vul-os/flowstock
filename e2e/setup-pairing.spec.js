@@ -85,8 +85,11 @@ test.describe("first run and pairing", () => {
       .click();
 
     // The banner confirms this device is now reachable by other branches.
+    // Matched exactly: the same wording appears inside the help text below the
+    // secret field, and a substring match resolves to both — which made this
+    // assertion pass only when it happened to run before the status refreshed.
     await expect(
-      first.page.getByText("Accepting sync connections"),
+      first.page.getByText("Accepting sync connections", { exact: true }),
     ).toBeVisible();
     const secret = await first.page.locator("#sync_secret").inputValue();
     expect(secret).not.toBe("");

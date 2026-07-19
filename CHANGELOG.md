@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - **Self-describing workspaces**: every synced row and op carries an `org_id`
   (generated on first run). Cross-workspace ops are rejected on apply and a
   peer that reports a different workspace is refused, so isolation no longer
-  rests on the shared secret alone. A fresh device *pairs in* by adopting the
+  rests on the shared secret alone. A fresh device _pairs in_ by adopting the
   workspace it joins; an established device never re-homes.
 - **Append-only goods-receipt ledger** (`po_receipts`): a line's received
   quantity is `SUM(qty)` over immutable receipt rows, so concurrent partial
@@ -38,9 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (b) an opt-in compatibility fallback (`sync_secret_fallback`, default off).
   Once a peer has enrolled a key, key auth is required and the mesh **fails
   closed**. Removing a peer row revokes its key; an inbound-only peer that paired
-  with you appears in the peer list (badged *inbound*) so you can revoke it.
+  with you appears in the peer list (badged _inbound_) so you can revoke it.
 
 ### Changed
+
 - Synced-table envelope gains `org_id`; `peers` gains `vector`, `pubkey` and
   `node_id` (idempotent additive migrations for existing databases).
 - Sync transport auth upgraded from a single shared Bearer secret to mutual key
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `received_quantity` is derived (never stored) and folded out of the schema.
 
 ### Fixed
+
 - Joining a workspace now records the joined peer's identity and acknowledged
   vector on the real peer row (previously written to a throwaway id and lost).
 
@@ -58,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Complete rebuild as a self-hosted, offline-first, decentralized inventory app.
 
 ### Added
+
 - **Single Go binary** that serves a React web UI and owns a local SQLite
   database — no cloud services, no accounts, no external dependencies. The
   built frontend is embedded (`go:embed`), so a release is one file.
@@ -92,7 +96,8 @@ Complete rebuild as a self-hosted, offline-first, decentralized inventory app.
   (fail-closed), peer management, and manual/background sync.
 
 ### Notes
+
 - Backend: Go 1.25 + pure-Go SQLite (`modernc.org/sqlite`); frontend: React 18
-  + Vite + shadcn/ui + recharts.
+  - Vite + shadcn/ui + recharts.
 - Replaces the previous Supabase/Firebase cloud prototype entirely; removes all
   accounts, organizations and network dependencies.

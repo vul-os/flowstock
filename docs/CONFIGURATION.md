@@ -18,14 +18,14 @@ resolve in the order **config file → environment variable → default**.
 }
 ```
 
-| Key | Env | Default | Notes |
-|---|---|---|---|
-| `port` | `FLOWSTOCK_PORT` | `8787` | HTTP listen port (also serves the sync mesh) |
-| `host` | `FLOWSTOCK_HOST` | `127.0.0.1` | bind interface — set `0.0.0.0` so other branches can reach this one |
-| `data_dir` | `FLOWSTOCK_DATA_DIR` | `~/.flowstock` | holds `flowstock.db` (and `snapshot.json` after a Compact) |
-| `password` | `FLOWSTOCK_PASSWORD` | *(empty)* | if set, gates the app + data API behind an owner password |
-| `frame_ancestors` | `FLOWSTOCK_FRAME_ANCESTORS` | *(empty)* | origins allowed to iframe FlowStock, e.g. `https://vulos.org` (for the Vulos OS shell) |
-| `sync_secret_fallback` | `FLOWSTOCK_SYNC_SECRET_FALLBACK` | `false` | when `true`, lets an already-enrolled sync peer authenticate with the shared secret alone instead of a request signature — a compatibility escape hatch for mixed-version fleets. Default `false` = mutual key auth is required once a peer has enrolled a key (the mesh fails closed) |
+| Key                    | Env                              | Default        | Notes                                                                                                                                                                                                                                                                                  |
+| ---------------------- | -------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port`                 | `FLOWSTOCK_PORT`                 | `8787`         | HTTP listen port (also serves the sync mesh)                                                                                                                                                                                                                                           |
+| `host`                 | `FLOWSTOCK_HOST`                 | `127.0.0.1`    | bind interface — set `0.0.0.0` so other branches can reach this one                                                                                                                                                                                                                    |
+| `data_dir`             | `FLOWSTOCK_DATA_DIR`             | `~/.flowstock` | holds `flowstock.db` (and `snapshot.json` after a Compact)                                                                                                                                                                                                                             |
+| `password`             | `FLOWSTOCK_PASSWORD`             | _(empty)_      | if set, gates the app + data API behind an owner password                                                                                                                                                                                                                              |
+| `frame_ancestors`      | `FLOWSTOCK_FRAME_ANCESTORS`      | _(empty)_      | origins allowed to iframe FlowStock, e.g. `https://vulos.org` (for the Vulos OS shell)                                                                                                                                                                                                 |
+| `sync_secret_fallback` | `FLOWSTOCK_SYNC_SECRET_FALLBACK` | `false`        | when `true`, lets an already-enrolled sync peer authenticate with the shared secret alone instead of a request signature — a compatibility escape hatch for mixed-version fleets. Default `false` = mutual key auth is required once a peer has enrolled a key (the mesh fails closed) |
 
 The `--port` flag overrides the port; `--version` prints the version.
 
@@ -37,7 +37,7 @@ branches**:
 - **Business** — business name, this branch's name, currency code/symbol, tax
   rate (VAT %, applied to purchase orders).
 - **Branches** — the shared branch registry; each install picks which branch it
-  *is* at first run. Stock levels and transfers are per branch.
+  _is_ at first run. Stock levels and transfers are per branch.
 - **Sync** — the shared secret (required to accept sync — no secret means the
   mesh rejects everything), the reachable address to advertise to peers, the
   peer list (name + URL, enable/disable, test, sync-now, per-peer status), an
@@ -71,7 +71,7 @@ generated on first run). Neither is edited by hand. See [SYNC.md](SYNC.md).
 - Sync signatures authenticate peers but do not encrypt the payload. Sync is
   plain HTTP over whatever network you run it on. Use a trusted LAN, a
   VPN/overlay (Tailscale, WireGuard, Netbird), or an HTTPS tunnel
-  (Vulos Relay, an *optional* convenience — never required). Peer URLs may be
+  (Vulos Relay, an _optional_ convenience — never required). Peer URLs may be
   `http://` or `https://`.
 - The **Sync folder** carries the same business data as the mesh. Treat it as
   trusted storage: a shared/private Dropbox or Syncthing folder, a NAS share

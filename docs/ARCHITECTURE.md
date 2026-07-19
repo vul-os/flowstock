@@ -45,10 +45,10 @@ not rest on the shared sync secret alone.
 
 Two merge classes:
 
-| Class | Tables | Merge rule |
-|---|---|---|
-| Catalog (mutable) | products, variants, customers, suppliers, orders, purchase orders, payments, branches, … | **Row-level last-writer-wins** on the HLC timestamp |
-| Ledger (immutable) | `stock_movements`, `po_receipts` | **Insert-only, set-union** — rows are never updated or deleted |
+| Class              | Tables                                                                                   | Merge rule                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Catalog (mutable)  | products, variants, customers, suppliers, orders, purchase orders, payments, branches, … | **Row-level last-writer-wins** on the HLC timestamp            |
+| Ledger (immutable) | `stock_movements`, `po_receipts`                                                         | **Insert-only, set-union** — rows are never updated or deleted |
 
 `po_receipts` records individual goods-receipt events; a purchase-order line's
 received quantity is `SUM(qty)` over its rows, derived at the read layer and
@@ -82,6 +82,7 @@ is derived from the oplog itself, so sync needs no per-peer state and every
 round is idempotent.
 
 Applying a remote op:
+
 1. `INSERT OR IGNORE` into the oplog (dedupe by HLC primary key)
 2. if fresh: upsert the row, guarded by `WHERE excluded.hlc > row.hlc`
    (LWW) — or plain `INSERT OR IGNORE` for the ledger table
@@ -95,11 +96,11 @@ node key and verified against the key enrolled for that node (the shared secret
 only bootstraps pairing; see [SYNC.md](SYNC.md)). With no enrolled key and no
 secret they reject every request (fail closed):
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/sync/vector` | this node's version vector |
-| `POST /api/sync/ops` | apply a pushed batch of ops |
-| `POST /api/sync/pull` | return ops newer than a supplied vector (batched) |
+| Endpoint               | Purpose                                           |
+| ---------------------- | ------------------------------------------------- |
+| `GET /api/sync/vector` | this node's version vector                        |
+| `POST /api/sync/ops`   | apply a pushed batch of ops                       |
+| `POST /api/sync/pull`  | return ops newer than a supplied vector (batched) |
 
 A sync round from node B against node A: fetch A's vector (which also carries
 A's `org_id` and public key) → push everything A lacks → repeatedly pull
@@ -126,7 +127,7 @@ conflicts.
 **Compaction** bounds oplog growth: it writes a checksummed, signed
 `snapshot.json` (full materialized state + version vector) and prunes ops that
 every enabled peer has acknowledged, keeping the newest op per origin node so
-the version vector (merged with a persisted *snapshot floor*) never regresses. A
+the version vector (merged with a persisted _snapshot floor_) never regresses. A
 brand-new node can rebuild from a snapshot and then sync only newer ops. Details
 and the pruning tradeoff are in [SYNC.md](SYNC.md).
 

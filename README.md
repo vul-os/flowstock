@@ -222,7 +222,7 @@ between branches.
 The centrepiece is a **two-node convergence test**: two separate processes with
 separate databases are paired through the Setup screen's "Join a branch" tab,
 edited while apart — including concurrent stock movements at the same branch —
-then synced, with convergence asserted in *both* browsers. A folder-sync test
+then synced, with convergence asserted in _both_ browsers. A folder-sync test
 proves the same thing with the network peers deleted, so only the shared
 `ops-<node>.jsonl` files can carry the data.
 

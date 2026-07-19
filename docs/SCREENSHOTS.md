@@ -20,15 +20,15 @@ in-browser demo driver.
 
 ## Captured views
 
-| File | View |
-|---|---|
-| `hero.png` | Dashboard |
-| `products.png` | Product catalog |
-| `stock.png` | Stock on hand per branch + movement ledger |
-| `orders.png` | Customer orders |
-| `purchase_orders.png` | Purchase orders / goods receiving |
-| `partners.png` | Customers & suppliers |
-| `creditors_debtors.png` | Balances & payments |
-| `report_sales.png` | Sales report |
-| `report_valuation.png` | Inventory valuation report |
-| `settings.png` | Settings — decentralized branch sync |
+| File                    | View                                       |
+| ----------------------- | ------------------------------------------ |
+| `hero.png`              | Dashboard                                  |
+| `products.png`          | Product catalog                            |
+| `stock.png`             | Stock on hand per branch + movement ledger |
+| `orders.png`            | Customer orders                            |
+| `purchase_orders.png`   | Purchase orders / goods receiving          |
+| `partners.png`          | Customers & suppliers                      |
+| `creditors_debtors.png` | Balances & payments                        |
+| `report_sales.png`      | Sales report                               |
+| `report_valuation.png`  | Inventory valuation report                 |
+| `settings.png`          | Settings — decentralized branch sync       |

@@ -1,0 +1,7 @@
+# Generated or vendored — owned by their tools, not by us.
+node_modules
+dist
+backend/cmd/flowstock/dist
+package-lock.json
+test-results
+playwright-report
