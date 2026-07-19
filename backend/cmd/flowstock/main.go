@@ -65,6 +65,7 @@ func main() {
 
 	syncEngine := syncpkg.New(st, func() string { return st.GetSetting("sync_secret") })
 	syncEngine.FolderFn = func() string { return st.GetSetting("sync_folder") }
+	syncEngine.AllowSecretFallback = cfg.SyncSecretFallback
 	apiServer := api.New(st, syncEngine, Version)
 	apiServer.SnapshotDir = cfg.DataDir
 	authHandler := auth.New(cfg.Password)
@@ -104,7 +105,7 @@ func main() {
 	go func() {
 		log.Printf("FlowStock %s — branch %q — http://%s", Version, st.GetSetting("branch_name"), cfg.Addr())
 		if st.GetSetting("sync_secret") != "" {
-			log.Printf("sync mesh live on the same port (bearer-authenticated)")
+			log.Printf("sync mesh live on the same port (mutual Ed25519 key auth; shared secret bootstraps pairing)")
 		}
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)

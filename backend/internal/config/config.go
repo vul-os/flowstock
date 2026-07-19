@@ -25,6 +25,12 @@ type Config struct {
 	// FrameAncestors controls which origins may embed FlowStock in an iframe
 	// (for the Vulos OS shell). Empty (default) = 'self' only.
 	FrameAncestors string `json:"frame_ancestors,omitempty"`
+	// SyncSecretFallback, when true, lets an already-enrolled sync peer keep
+	// authenticating with the shared secret alone instead of a request
+	// signature. Default false = mutual key auth is required once a peer has
+	// enrolled a key (the mesh fails closed). This is a compatibility escape
+	// hatch for mixed-version fleets.
+	SyncSecretFallback bool `json:"sync_secret_fallback,omitempty"`
 }
 
 const configName = "flowstock.config.json"
@@ -56,6 +62,9 @@ func Load() *Config {
 	}
 	if v := os.Getenv("FLOWSTOCK_FRAME_ANCESTORS"); v != "" {
 		cfg.FrameAncestors = v
+	}
+	if v := os.Getenv("FLOWSTOCK_SYNC_SECRET_FALLBACK"); v == "1" || v == "true" {
+		cfg.SyncSecretFallback = true
 	}
 
 	// Defaults.

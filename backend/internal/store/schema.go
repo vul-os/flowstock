@@ -156,5 +156,50 @@ func initSchema(db *sql.DB) error {
 			vector TEXT NOT NULL DEFAULT '',
 			pubkey TEXT NOT NULL DEFAULT ''
 		);`)
+	if err != nil {
+		return err
+	}
+
+	// Additive migrations for databases created by earlier versions, whose
+	// peers table predates these columns (CREATE TABLE IF NOT EXISTS never adds
+	// columns to an existing table). node_id lets a peer row be looked up by the
+	// remote node's identity, which is how inbound requests are authenticated
+	// against a recorded Ed25519 key (see sync transport auth).
+	for _, c := range []struct{ col, decl string }{
+		{"vector", "TEXT NOT NULL DEFAULT ''"},
+		{"pubkey", "TEXT NOT NULL DEFAULT ''"},
+		{"node_id", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := addColumnIfMissing(db, "peers", c.col, c.decl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// addColumnIfMissing adds a column to an existing table only when it is not
+// already present, so schema upgrades are idempotent and non-destructive.
+func addColumnIfMissing(db *sql.DB, table, col, decl string) error {
+	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == col {
+			return nil // already present
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, decl))
 	return err
 }

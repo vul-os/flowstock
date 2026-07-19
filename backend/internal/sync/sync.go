@@ -6,14 +6,16 @@
 // topology works (pair, hub-and-spoke, full mesh) and a branch that was
 // offline simply catches up on its next reachable round.
 //
-// All endpoints require Authorization: Bearer <shared secret>. With no secret
-// configured the endpoints reject every request (fail closed).
+// Every sync request is authenticated by a mutual Ed25519 signature over a
+// canonical request envelope, verified against the key recorded for the caller
+// node; the shared secret survives only as the pairing bootstrap and an opt-in
+// compatibility fallback (see transport_auth.go). With no secret and no
+// enrolled key, requests are rejected (fail closed).
 package sync
 
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,9 +38,14 @@ type Engine struct {
 	// FolderFn, if set, returns the shared-folder path for file-based transport
 	// (empty = disabled). Read on every round so toggling it takes effect live.
 	FolderFn func() string
-	NodeID   string
-	client   *http.Client
-	mu       sync.Mutex // serializes outbound rounds
+	// AllowSecretFallback lets an already-enrolled peer authenticate with the
+	// shared secret alone (compatibility). Default false = key auth required once
+	// a peer has enrolled a key (fail closed).
+	AllowSecretFallback bool
+	NodeID              string
+	client              *http.Client
+	nonces              *nonceCache
+	mu                  sync.Mutex // serializes outbound rounds
 }
 
 func New(s *store.Store, secretFn func() string) *Engine {
@@ -47,15 +54,17 @@ func New(s *store.Store, secretFn func() string) *Engine {
 		SecretFn: secretFn,
 		NodeID:   s.NodeID(),
 		client:   &http.Client{Timeout: 20 * time.Second},
+		nonces:   newNonceCache(),
 	}
 }
 
 type opsMsg struct {
 	NodeID string     `json:"node_id"`
 	Ops    []store.Op `json:"ops"`
-	// PubKey + Sig sign the batch (Ed25519 over the marshaled ops), making it
-	// tamper-evident. Transport auth is still the shared Bearer secret; these
-	// are groundwork and are verified when present.
+	// PubKey + Sig sign the batch (Ed25519 over the marshaled ops). The request
+	// envelope signature (transport_auth.go) already binds the whole body to the
+	// caller's key; this batch signature is kept as defence-in-depth so a relayed
+	// batch stays attributable and tamper-evident on its own.
 	PubKey string `json:"pubkey,omitempty"`
 	Sig    string `json:"sig,omitempty"`
 }
@@ -64,83 +73,65 @@ type pullReq struct {
 	Vector map[string]string `json:"vector"`
 }
 
-func (e *Engine) authed(r *http.Request) bool {
-	secret := e.SecretFn()
-	if secret == "" {
-		return false
-	}
-	presented := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	return subtle.ConstantTimeCompare([]byte(presented), []byte(secret)) == 1
-}
-
-// Handler returns the /api/sync/* routes.
+// Handler returns the /api/sync/* routes. Every route except the unauthenticated
+// liveness ping is wrapped in guard, which enforces mutual key authentication.
 func (e *Engine) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/sync/ping", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "flowstock")
 	})
-
-	mux.HandleFunc("GET /api/sync/vector", func(w http.ResponseWriter, r *http.Request) {
-		if !e.authed(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		vec, err := e.Store.Vector()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]any{"node_id": e.NodeID, "org_id": e.Store.OrgID(), "pubkey": e.Store.PublicKeyHex(), "vector": vec})
-	})
-
-	mux.HandleFunc("POST /api/sync/ops", func(w http.ResponseWriter, r *http.Request) {
-		if !e.authed(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		var msg opsMsg
-		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		// If the batch is signed, it must verify against its public key —
-		// tamper-evidence on top of the transport secret. Unsigned batches are
-		// still accepted (transport auth already gated them).
-		if msg.Sig != "" || msg.PubKey != "" {
-			body, _ := json.Marshal(msg.Ops)
-			if !store.VerifySig(msg.PubKey, body, msg.Sig) {
-				http.Error(w, "op batch signature invalid", http.StatusBadRequest)
-				return
-			}
-		}
-		applied, err := e.Store.ApplyOps(msg.Ops)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]any{"applied": applied})
-	})
-
-	mux.HandleFunc("POST /api/sync/pull", func(w http.ResponseWriter, r *http.Request) {
-		if !e.authed(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		var req pullReq
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		ops, err := e.Store.OpsAfter(req.Vector, Batch)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, opsMsg{NodeID: e.NodeID, Ops: ops})
-	})
+	mux.HandleFunc("GET /api/sync/vector", e.guard(e.handleVector))
+	mux.HandleFunc("POST /api/sync/ops", e.guard(e.handleOps))
+	mux.HandleFunc("POST /api/sync/pull", e.guard(e.handlePull))
 
 	return mux
+}
+
+func (e *Engine) handleVector(w http.ResponseWriter, r *http.Request) {
+	vec, err := e.Store.Vector()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"node_id": e.NodeID, "org_id": e.Store.OrgID(), "pubkey": e.Store.PublicKeyHex(), "vector": vec})
+}
+
+func (e *Engine) handleOps(w http.ResponseWriter, r *http.Request) {
+	var msg opsMsg
+	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// If the batch carries its own signature, it must verify against its public
+	// key — tamper-evidence independent of the transport envelope.
+	if msg.Sig != "" || msg.PubKey != "" {
+		body, _ := json.Marshal(msg.Ops)
+		if !store.VerifySig(msg.PubKey, body, msg.Sig) {
+			http.Error(w, "op batch signature invalid", http.StatusBadRequest)
+			return
+		}
+	}
+	applied, err := e.Store.ApplyOps(msg.Ops)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"applied": applied})
+}
+
+func (e *Engine) handlePull(w http.ResponseWriter, r *http.Request) {
+	var req pullReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ops, err := e.Store.OpsAfter(req.Vector, Batch)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, opsMsg{NodeID: e.NodeID, Ops: ops})
 }
 
 // Result reports the outcome of syncing one peer.
@@ -170,13 +161,15 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	// 1. Learn the peer's vector (and workspace id), then push everything it
 	// lacks. The window vector advances past each pushed batch so batches never
 	// overlap.
-	peerVec, peerOrg, peerPub, err := e.fetchVector(ctx, base, auth)
+	peerVec, peerNode, peerOrg, peerPub, err := e.fetchVector(ctx, base, auth)
 	if err != nil {
 		res.Error = err.Error()
 		return res
 	}
 	if peerPub != "" {
-		e.Store.SavePeerPubkey(peerID, peerPub) // learned/confirmed on pairing
+		// Learn/confirm the peer's identity so inbound requests from that same
+		// node can later be authenticated by key.
+		e.Store.SavePeerIdentity(peerID, peerNode, peerPub)
 	}
 	// Pairing: a brand-new node adopts the workspace it is joining. An
 	// established node keeps its own workspace, and mismatched ops are rejected
@@ -250,29 +243,31 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	return res
 }
 
-func (e *Engine) fetchVector(ctx context.Context, base, auth string) (map[string]string, string, string, error) {
+func (e *Engine) fetchVector(ctx context.Context, base, auth string) (map[string]string, string, string, string, error) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", base+"/api/sync/vector", nil)
 	req.Header.Set("Authorization", auth)
+	e.signRequest(req, nil)
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, "", "", fmt.Errorf("vector: HTTP %d", resp.StatusCode)
+		return nil, "", "", "", fmt.Errorf("vector: HTTP %d (%s)", resp.StatusCode, statusText(resp))
 	}
 	var body struct {
 		Vector map[string]string `json:"vector"`
+		NodeID string            `json:"node_id"`
 		OrgID  string            `json:"org_id"`
 		PubKey string            `json:"pubkey"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	if body.Vector == nil {
 		body.Vector = map[string]string{}
 	}
-	return body.Vector, body.OrgID, body.PubKey, nil
+	return body.Vector, body.NodeID, body.OrgID, body.PubKey, nil
 }
 
 func (e *Engine) postOps(ctx context.Context, base, auth string, ops []store.Op) error {
@@ -286,13 +281,14 @@ func (e *Engine) postOps(ctx context.Context, base, auth string, ops []store.Op)
 	req, _ := http.NewRequestWithContext(ctx, "POST", base+"/api/sync/ops", bytes.NewReader(buf))
 	req.Header.Set("Authorization", auth)
 	req.Header.Set("Content-Type", "application/json")
+	e.signRequest(req, buf)
 	resp, err := e.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("push: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("push: HTTP %d (%s)", resp.StatusCode, statusText(resp))
 	}
 	return nil
 }
@@ -302,13 +298,14 @@ func (e *Engine) pull(ctx context.Context, base, auth string, vec map[string]str
 	req, _ := http.NewRequestWithContext(ctx, "POST", base+"/api/sync/pull", bytes.NewReader(buf))
 	req.Header.Set("Authorization", auth)
 	req.Header.Set("Content-Type", "application/json")
+	e.signRequest(req, buf)
 	resp, err := e.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("pull: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("pull: HTTP %d (%s)", resp.StatusCode, statusText(resp))
 	}
 	var msg opsMsg
 	if err := json.NewDecoder(resp.Body).Decode(&msg); err != nil {
@@ -317,11 +314,18 @@ func (e *Engine) pull(ctx context.Context, base, auth string, vec map[string]str
 	return msg.Ops, nil
 }
 
+// statusText returns a short trimmed body for surfacing an auth error to the UI.
+func statusText(resp *http.Response) string {
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	return strings.TrimSpace(string(b))
+}
+
 // TestPeer checks reachability + auth against a peer URL.
 func (e *Engine) TestPeer(ctx context.Context, baseURL string) bool {
 	base := strings.TrimRight(baseURL, "/")
 	req, _ := http.NewRequestWithContext(ctx, "GET", base+"/api/sync/vector", nil)
 	req.Header.Set("Authorization", "Bearer "+e.SecretFn())
+	e.signRequest(req, nil)
 	resp, err := e.client.Do(req)
 	if err != nil {
 		return false

@@ -606,7 +606,9 @@ func (s *Store) MovementsForRef(refKind, refID, kind string) ([]map[string]any, 
 
 // ── peers ─────────────────────────────────────────────────────────────────────
 
-// Peer is another branch node.
+// Peer is another branch node. NodeID is the remote node's identity once known
+// (learned when we dial it, or recorded when it enrolls a key inbound); an
+// inbound-only enrollment has a NodeID and a pubkey but no dial URL.
 type Peer struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -614,11 +616,13 @@ type Peer struct {
 	Enabled    bool   `json:"enabled"`
 	LastSyncAt string `json:"last_sync_at"`
 	LastStatus string `json:"last_status"`
+	NodeID     string `json:"node_id"`
+	HasKey     bool   `json:"has_key"`
 }
 
 func (s *Store) ListPeers() ([]Peer, error) {
 	rows, err := s.db.Query(
-		"SELECT id, name, url, enabled, last_sync_at, last_status FROM peers ORDER BY name")
+		"SELECT id, name, url, enabled, last_sync_at, last_status, node_id, pubkey FROM peers ORDER BY name")
 	if err != nil {
 		return nil, err
 	}
@@ -627,10 +631,12 @@ func (s *Store) ListPeers() ([]Peer, error) {
 	for rows.Next() {
 		var p Peer
 		var en int
-		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &en, &p.LastSyncAt, &p.LastStatus); err != nil {
+		var pubkey string
+		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &en, &p.LastSyncAt, &p.LastStatus, &p.NodeID, &pubkey); err != nil {
 			return nil, err
 		}
 		p.Enabled = en != 0
+		p.HasKey = pubkey != ""
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -669,11 +675,60 @@ func (s *Store) SavePeerPubkey(id, pubkeyHex string) {
 	_, _ = s.db.Exec("UPDATE peers SET pubkey = ? WHERE id = ?", pubkeyHex, id)
 }
 
+// SavePeerIdentity records both the remote node's id and its Ed25519 public key
+// (hex) against a peer row we dial. Storing the node id lets inbound requests
+// from that same node be authenticated by key (see PubkeyForNode).
+func (s *Store) SavePeerIdentity(id, nodeID, pubkeyHex string) {
+	_, _ = s.db.Exec("UPDATE peers SET node_id = ?, pubkey = ? WHERE id = ?", nodeID, pubkeyHex, id)
+}
+
 // PeerPubkey returns a peer's recorded public key (hex), or "".
 func (s *Store) PeerPubkey(id string) string {
 	var v string
 	_ = s.db.QueryRow("SELECT pubkey FROM peers WHERE id = ?", id).Scan(&v)
 	return v
+}
+
+// PubkeyForNode returns the recorded Ed25519 public key (hex) for a remote node
+// id, or "" if that node has never enrolled a key. It is the authority for
+// mutual key authentication: an inbound signed request is verified against the
+// key returned here, so an attacker cannot present its own key for another
+// node's id.
+func (s *Store) PubkeyForNode(nodeID string) string {
+	if nodeID == "" {
+		return ""
+	}
+	var v string
+	_ = s.db.QueryRow(
+		"SELECT pubkey FROM peers WHERE node_id = ? AND pubkey <> '' LIMIT 1", nodeID).Scan(&v)
+	return v
+}
+
+// RecordPeerIdentity enrolls a remote node's public key for inbound key auth.
+// If a peer row already references this node id, its key is updated in place;
+// otherwise an inbound-only row (no dial URL) is inserted so the operator can
+// see — and, by deleting the row, revoke — every node that has paired inbound.
+// Enrolling the same key again is a no-op.
+func (s *Store) RecordPeerIdentity(nodeID, pubkeyHex string) {
+	if nodeID == "" || pubkeyHex == "" {
+		return
+	}
+	if s.PubkeyForNode(nodeID) == pubkeyHex {
+		return // already enrolled with this exact key
+	}
+	res, err := s.db.Exec("UPDATE peers SET pubkey = ? WHERE node_id = ?", pubkeyHex, nodeID)
+	if err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			return
+		}
+	}
+	name := "inbound " + nodeID
+	if len(nodeID) > 8 {
+		name = "inbound " + nodeID[:8]
+	}
+	_, _ = s.db.Exec(
+		`INSERT INTO peers (id, name, url, enabled, node_id, pubkey) VALUES (?, ?, '', 1, ?, ?)`,
+		NewID(), name, nodeID, pubkeyHex)
 }
 
 // EnabledPeerVectors returns the saved version vector of every enabled peer.

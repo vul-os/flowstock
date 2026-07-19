@@ -54,7 +54,14 @@ func TestSnapshotIsSigned(t *testing.T) {
 	if !loaded.VerifySignature() {
 		t.Fatal("snapshot signature must verify")
 	}
-	loaded.Checksum = loaded.Checksum[:len(loaded.Checksum)-1] + "0"
+	// Flip the last checksum hex digit to a guaranteed-different value (using
+	// "0" unconditionally would be a no-op ~1/16 of the time).
+	last := loaded.Checksum[len(loaded.Checksum)-1]
+	repl := byte('0')
+	if last == '0' {
+		repl = '1'
+	}
+	loaded.Checksum = loaded.Checksum[:len(loaded.Checksum)-1] + string(repl)
 	if loaded.VerifySignature() {
 		t.Fatal("a mutated checksum must break signature verification")
 	}

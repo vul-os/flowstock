@@ -177,14 +177,18 @@ func TestTwoBranchesSyncOverHTTPAndSurviveOffline(t *testing.T) {
 		t.Fatalf("expected a quiet round, got pushed=%d pulled=%d", res.Pushed, res.Pulled)
 	}
 
-	// Auth: wrong secret is rejected.
+	// Auth: with mutual key auth, an enrolled peer authenticates by its Ed25519
+	// key, so the shared secret is no longer the gate — a wrong (or empty) secret
+	// still syncs, because B signs every request with its identity key that A
+	// enrolled on the first round.
 	_ = b.st.SetSetting("sync_secret", "wrong")
 	res = b.eng.SyncPeer(ctx, "peerA", a.server.URL)
-	if res.OK {
-		t.Fatal("sync with wrong secret must fail")
+	if !res.OK {
+		t.Fatalf("enrolled peer should authenticate by key regardless of secret: %s", res.Error)
 	}
 
-	// No-secret listener rejects (fail closed).
+	// An unsigned request (legacy bearer-only) is rejected once the listener has
+	// no secret: no key, no secret → fail closed.
 	_ = a.st.SetSetting("sync_secret", "")
 	req, _ := http.NewRequest("GET", a.server.URL+"/api/sync/vector", nil)
 	req.Header.Set("Authorization", "Bearer anything")
@@ -194,6 +198,6 @@ func TestTwoBranchesSyncOverHTTPAndSurviveOffline(t *testing.T) {
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("no-secret listener should 401, got %d", resp.StatusCode)
+		t.Fatalf("no-secret listener should 401 an unsigned request, got %d", resp.StatusCode)
 	}
 }
