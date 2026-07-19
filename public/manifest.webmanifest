@@ -1,0 +1,19 @@
+{
+  "name": "FlowStock",
+  "short_name": "FlowStock",
+  "description": "Offline-first inventory for multi-branch businesses.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f0e4",
+  "theme_color": "#0f6d7a",
+  "icons": [
+    {
+      "src": "/flowstock-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

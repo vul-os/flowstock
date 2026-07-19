@@ -1,13 +1,34 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/flowstock-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FlowStock</title>
-</head>
-<body>
+    <meta
+      name="description"
+      content="Offline-first inventory for multi-branch businesses."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/flowstock-logo.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- kraft paper in light, warehouse charcoal in dark -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f6f0e4"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#161311"
+    />
+    <meta name="color-scheme" content="light dark" />
+  </head>
+  <body>
     <div id="root" class="font-sans antialiased"></div>
     <script type="module" src="/src/main.jsx"></script>
-</body>
+  </body>
 </html>
