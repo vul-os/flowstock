@@ -13,7 +13,7 @@ that keeps every branch in sync, even when branches go offline.
 
 <sub>Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
-*Vulos — rooted in **vula**, the Zulu and Xhosa word for **open**.*
+_Vulos — rooted in **vula**, the Zulu and Xhosa word for **open**._
 
 ![FlowStock dashboard](docs/screenshots/hero.png)
 
@@ -60,7 +60,7 @@ branches need to sync across the internet without opening ports.
   merges last-writer-wins, stock movements + goods receipts merge by union; any
   topology (pair, hub-and-spoke, mesh); authenticated, fail-closed
 - 🏷️ **Self-describing workspaces** — every row and op carries a workspace
-  `org_id`; cross-workspace ops are rejected, and a new device *pairs in* by
+  `org_id`; cross-workspace ops are rejected, and a new device _pairs in_ by
   adopting the workspace rather than starting its own
 - 📁 **Folder sync (no network needed)** — replicate through Dropbox, Google
   Drive, Syncthing, a NAS, or a **USB stick** (sneakernet); each device writes
@@ -142,7 +142,7 @@ npm install && npm run dev    # → http://localhost:5173
 **Connect a second branch:** run each with `FLOWSTOCK_HOST=0.0.0.0`, set the
 same sync secret on both (Settings → Sync) to pair them — after pairing they
 authenticate each other by key — add the other's URL (`http://<host>:8787`) as a
-peer, *Sync now*. Details in
+peer, _Sync now_. Details in
 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ## How it works
@@ -180,13 +180,13 @@ Vulos OS embedding). Business, branches and sync are configured in-app. See
 
 ## Documentation
 
-| Doc | Contents |
-|---|---|
-| [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | install, first run, connecting branches, backups |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Go binary, data model, oplog & clocks, sync protocol |
-| [docs/SYNC.md](docs/SYNC.md) | topologies, security, merge semantics, conflict examples |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | every setting + environment variables |
-| [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | regenerating the README screenshots |
+| Doc                                                | Contents                                                 |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | install, first run, connecting branches, backups         |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Go binary, data model, oplog & clocks, sync protocol     |
+| [docs/SYNC.md](docs/SYNC.md)                       | topologies, security, merge semantics, conflict examples |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)     | every setting + environment variables                    |
+| [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)         | regenerating the README screenshots                      |
 
 ## Development
 
