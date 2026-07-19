@@ -24,15 +24,15 @@ const SnapshotVersion = 1
 
 // Snapshot is a self-describing, verifiable point-in-time state capture.
 type Snapshot struct {
-	Version   int                        `json:"version"`
-	OrgID     string                     `json:"org_id"`
-	NodeID    string                     `json:"node_id"`
-	CreatedAt string                     `json:"created_at"`
-	Vector    map[string]string          `json:"vector"`
+	Version   int                         `json:"version"`
+	OrgID     string                      `json:"org_id"`
+	NodeID    string                      `json:"node_id"`
+	CreatedAt string                      `json:"created_at"`
+	Vector    map[string]string           `json:"vector"`
 	Tables    map[string][]map[string]any `json:"tables"`
-	Checksum  string                     `json:"checksum"`            // sha256 hex over the body
-	Signature string                     `json:"signature,omitempty"` // Ed25519 hex over the checksum (optional)
-	PublicKey string                     `json:"public_key,omitempty"`
+	Checksum  string                      `json:"checksum"`            // sha256 hex over the body
+	Signature string                      `json:"signature,omitempty"` // Ed25519 hex over the checksum (optional)
+	PublicKey string                      `json:"public_key,omitempty"`
 }
 
 // checksumBody hashes everything that defines the snapshot's content, excluding
