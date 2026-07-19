@@ -12,9 +12,12 @@ func newNode(t *testing.T, name string) *Store {
 	if err != nil {
 		t.Fatalf("open %s: %v", name, err)
 	}
-	// Force a stable, distinct node id per logical node.
+	// Force a stable, distinct node id per logical node, and a shared workspace
+	// id so nodes in the same test belong to one workspace and their ops merge.
 	s.nodeID = name
 	s.clock = NewHLC(name, "")
+	s.orgID = "test-org"
+	_ = s.SetSetting("org_id", "test-org")
 	t.Cleanup(func() { s.Close() })
 	return s
 }
@@ -133,6 +136,59 @@ func TestThreeNodesConvergeViaHub(t *testing.T) {
 		if got := stock(t, n, "v9"); got != 3.0 {
 			t.Fatalf("node stock = %v, want 3", got)
 		}
+	}
+}
+
+func TestCrossOrgOpsAreRejected(t *testing.T) {
+	a := newNode(t, "A")
+	b := newNode(t, "B")
+	// B belongs to a different workspace than A.
+	b.orgID = "other-org"
+	_ = b.SetSetting("org_id", "other-org")
+
+	put(t, a, "products", "p1", map[string]any{"name": "A's product"}, false)
+	put(t, a, "stock_movements", "m1", map[string]any{"variant_id": "v1", "branch_id": "bA", "qty_delta": 5.0, "kind": "receive"}, false)
+
+	// Feed A's ops directly to B. Different-org ops must be dropped, not merged.
+	va, _ := b.Vector()
+	ops, _ := a.OpsAfter(va, 100000)
+	applied, err := b.ApplyOps(ops)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applied != 0 {
+		t.Fatalf("expected 0 cross-org ops applied, got %d", applied)
+	}
+	if rows, _ := b.ListRows("products", false); len(rows) != 0 {
+		t.Fatalf("cross-org product leaked into B: %d rows", len(rows))
+	}
+	if got := stock(t, b, "v1"); got != 0 {
+		t.Fatalf("cross-org stock leaked into B: %v", got)
+	}
+}
+
+func TestFreshNodeAdoptsOrgButEstablishedDoesNot(t *testing.T) {
+	// A fresh node (no authored ops) adopts the workspace it joins.
+	fresh := newNode(t, "F")
+	fresh.orgID = "F-own"
+	_ = fresh.SetSetting("org_id", "F-own")
+	adopted, err := fresh.AdoptOrg("workspace-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !adopted || fresh.OrgID() != "workspace-1" {
+		t.Fatalf("fresh node should adopt: adopted=%v org=%s", adopted, fresh.OrgID())
+	}
+
+	// An established node (has authored ops) refuses to re-home.
+	est := newNode(t, "E")
+	put(t, est, "products", "p1", map[string]any{"name": "x"}, false)
+	adopted, err = est.AdoptOrg("workspace-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adopted || est.OrgID() != "test-org" {
+		t.Fatalf("established node must not re-home: adopted=%v org=%s", adopted, est.OrgID())
 	}
 }
 

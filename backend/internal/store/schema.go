@@ -94,6 +94,10 @@ func initSchema(db *sql.DB) error {
 		return err
 	}
 
+	// Every synced table shares the envelope columns. org_id makes each row
+	// self-describing about which workspace owns it, so isolation no longer
+	// rests only on the shared sync secret (see store.go: ApplyOps rejects
+	// cross-org ops).
 	for _, td := range tables {
 		cols := ""
 		for _, c := range td.cols {
@@ -102,7 +106,8 @@ func initSchema(db *sql.DB) error {
 		stmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
 			id TEXT PRIMARY KEY,
 			hlc TEXT NOT NULL DEFAULT '',
-			deleted INTEGER NOT NULL DEFAULT 0%s
+			deleted INTEGER NOT NULL DEFAULT 0,
+			org_id TEXT NOT NULL DEFAULT ''%s
 		);`, td.name, cols)
 		if _, err := db.Exec(stmt); err != nil {
 			return fmt.Errorf("create %s: %w", td.name, err)
@@ -120,6 +125,7 @@ func initSchema(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS oplog (
 			hlc TEXT PRIMARY KEY,
 			node_id TEXT NOT NULL,
+			org_id TEXT NOT NULL DEFAULT '',
 			tbl TEXT NOT NULL,
 			row_id TEXT NOT NULL,
 			deleted INTEGER NOT NULL DEFAULT 0,

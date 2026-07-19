@@ -83,7 +83,7 @@ func (e *Engine) Handler() http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"node_id": e.NodeID, "vector": vec})
+		writeJSON(w, map[string]any{"node_id": e.NodeID, "org_id": e.Store.OrgID(), "vector": vec})
 	})
 
 	mux.HandleFunc("POST /api/sync/ops", func(w http.ResponseWriter, r *http.Request) {
@@ -127,11 +127,12 @@ func (e *Engine) Handler() http.Handler {
 
 // Result reports the outcome of syncing one peer.
 type Result struct {
-	PeerID string `json:"peer_id"`
-	OK     bool   `json:"ok"`
-	Pushed int    `json:"pushed"`
-	Pulled int    `json:"pulled"`
-	Error  string `json:"error"`
+	PeerID  string `json:"peer_id"`
+	OK      bool   `json:"ok"`
+	Pushed  int    `json:"pushed"`
+	Pulled  int    `json:"pulled"`
+	Adopted bool   `json:"adopted"`
+	Error   string `json:"error"`
 }
 
 // SyncPeer runs one full round against a peer base URL.
@@ -148,11 +149,25 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	base := strings.TrimRight(baseURL, "/")
 	auth := "Bearer " + secret
 
-	// 1. Learn the peer's vector, then push everything it lacks. The window
-	// vector advances past each pushed batch so batches never overlap.
-	peerVec, err := e.fetchVector(ctx, base, auth)
+	// 1. Learn the peer's vector (and workspace id), then push everything it
+	// lacks. The window vector advances past each pushed batch so batches never
+	// overlap.
+	peerVec, peerOrg, err := e.fetchVector(ctx, base, auth)
 	if err != nil {
 		res.Error = err.Error()
+		return res
+	}
+	// Pairing: a brand-new node adopts the workspace it is joining. An
+	// established node keeps its own workspace, and mismatched ops are rejected
+	// on apply, so two real workspaces never silently merge over a shared secret.
+	if adopted, aerr := e.Store.AdoptOrg(peerOrg); aerr != nil {
+		res.Error = aerr.Error()
+		return res
+	} else if adopted {
+		res.Adopted = true
+	}
+	if myOrg := e.Store.OrgID(); peerOrg != "" && myOrg != "" && peerOrg != myOrg {
+		res.Error = fmt.Sprintf("peer is a different workspace (%s ≠ %s); refusing to sync", peerOrg, myOrg)
 		return res
 	}
 	window := peerVec
@@ -210,27 +225,28 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	return res
 }
 
-func (e *Engine) fetchVector(ctx context.Context, base, auth string) (map[string]string, error) {
+func (e *Engine) fetchVector(ctx context.Context, base, auth string) (map[string]string, string, error) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", base+"/api/sync/vector", nil)
 	req.Header.Set("Authorization", auth)
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("vector: HTTP %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("vector: HTTP %d", resp.StatusCode)
 	}
 	var body struct {
 		Vector map[string]string `json:"vector"`
+		OrgID  string            `json:"org_id"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if body.Vector == nil {
 		body.Vector = map[string]string{}
 	}
-	return body.Vector, nil
+	return body.Vector, body.OrgID, nil
 }
 
 func (e *Engine) postOps(ctx context.Context, base, auth string, ops []store.Op) error {

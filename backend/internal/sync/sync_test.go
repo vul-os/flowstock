@@ -25,6 +25,11 @@ func newNode(t *testing.T, name, secret string) *node {
 	if err != nil {
 		t.Fatalf("open %s: %v", name, err)
 	}
+	// Both test nodes belong to one workspace. Adopting before any local op is
+	// authored is exactly how a fresh node pairs into an existing workspace.
+	if _, err := st.AdoptOrg("shared-workspace"); err != nil {
+		t.Fatalf("adopt org: %v", err)
+	}
 	_ = st.SetSetting("sync_secret", secret)
 	_ = st.SetSetting("branch_id", "branch-"+name)
 	_ = st.SetSetting("branch_name", "Branch "+name)
@@ -51,6 +56,65 @@ func stock(t *testing.T, st *store.Store, variant string) float64 {
 		}
 	}
 	return total
+}
+
+// newRawNode is like newNode but does NOT adopt a shared workspace, so the
+// node keeps whatever org id Open generated for it.
+func newRawNode(t *testing.T, name, secret string) *node {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), name+".db"))
+	if err != nil {
+		t.Fatalf("open %s: %v", name, err)
+	}
+	_ = st.SetSetting("sync_secret", secret)
+	eng := New(st, func() string { return st.GetSetting("sync_secret") })
+	srv := httptest.NewServer(eng.Handler())
+	t.Cleanup(func() { srv.Close(); st.Close() })
+	return &node{st: st, eng: eng, server: srv}
+}
+
+func TestPairingAdoptsWorkspaceAndBlocksForeignWorkspace(t *testing.T) {
+	ctx := context.Background()
+
+	// A is an established workspace with data.
+	a := newRawNode(t, "A", "shared-secret")
+	put(t, a.st, "products", "p1", map[string]any{"name": "Anvil"})
+	put(t, a.st, "stock_movements", "m1", map[string]any{"variant_id": "v1", "branch_id": "brA", "qty_delta": 12.0, "kind": "receive"})
+
+	// Joiner is brand new; it adopts A's workspace on first sync and pulls data.
+	joiner := newRawNode(t, "J", "shared-secret")
+	res := joiner.eng.SyncPeer(ctx, "peerA", a.server.URL)
+	if !res.OK {
+		t.Fatalf("join sync failed: %s", res.Error)
+	}
+	if !res.Adopted {
+		t.Fatal("joiner should have adopted A's workspace")
+	}
+	if joiner.st.OrgID() != a.st.OrgID() {
+		t.Fatalf("workspace not adopted: %s vs %s", joiner.st.OrgID(), a.st.OrgID())
+	}
+	if got := stock(t, joiner.st, "v1"); got != 12.0 {
+		t.Fatalf("joiner stock = %v, want 12", got)
+	}
+
+	// A foreign, already-established workspace with the same secret is refused
+	// (shared secret alone is not enough to merge two real workspaces).
+	foreign := newRawNode(t, "X", "shared-secret")
+	put(t, foreign.st, "products", "px", map[string]any{"name": "Foreign"})
+	res = foreign.eng.SyncPeer(ctx, "peerA", a.server.URL)
+	if res.OK {
+		t.Fatal("foreign established workspace must be refused")
+	}
+	if foreign.st.OrgID() == a.st.OrgID() {
+		t.Fatal("foreign workspace must not have re-homed")
+	}
+	// A stays clean.
+	rows, _ := a.st.ListRows("products", false)
+	for _, r := range rows {
+		if r["name"] == "Foreign" {
+			t.Fatal("foreign product leaked into A")
+		}
+	}
 }
 
 func TestTwoBranchesSyncOverHTTPAndSurviveOffline(t *testing.T) {

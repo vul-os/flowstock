@@ -20,6 +20,7 @@ func (s *Server) syncSettings() map[string]any {
 		"secret":    s.Store.GetSetting("sync_secret"),
 		"listening": listen,
 		"node_id":   s.Store.NodeID(),
+		"org_id":    s.Store.OrgID(),
 	}
 }
 

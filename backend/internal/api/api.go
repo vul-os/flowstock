@@ -128,6 +128,7 @@ func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"initialized":   get("branch_id") != "",
 		"node_id":       s.Store.NodeID(),
+		"org_id":        s.Store.OrgID(),
 		"branch_id":     get("branch_id"),
 		"branch_name":   get("branch_name"),
 		"business_name": get("business_name"),

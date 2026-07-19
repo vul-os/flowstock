@@ -17,9 +17,14 @@ import (
 )
 
 // Op is one journalled mutation. It is the unit of replication.
+//
+// OrgID names the workspace that produced the op. It travels with every op so
+// data is self-describing: a node rejects ops from a different workspace even
+// if a shared sync secret happens to match (see ApplyOps).
 type Op struct {
 	HLC     string          `json:"hlc"`
 	NodeID  string          `json:"node_id"`
+	OrgID   string          `json:"org_id"`
 	Tbl     string          `json:"tbl"`
 	RowID   string          `json:"row_id"`
 	Deleted bool            `json:"deleted"`
@@ -33,6 +38,7 @@ type Store struct {
 	db     *sql.DB
 	clock  *HLC
 	nodeID string
+	orgID  string
 	// onChange fires after any committed local or remote mutation so the UI
 	// can refresh (wired to an SSE broadcaster in the api layer).
 	onChange func()
@@ -63,6 +69,21 @@ func Open(path string) (*Store, error) {
 	}
 	s.nodeID = node
 
+	// Every workspace has a stable org id, generated once on a brand-new
+	// database. A node adopts a peer's org id when it pairs into an existing
+	// workspace (see AdoptOrg); until then it owns its own.
+	org, err := s.getSetting("org_id")
+	if err != nil {
+		return nil, err
+	}
+	if org == "" {
+		org = NewID()
+		if err := s.SetSetting("org_id", org); err != nil {
+			return nil, err
+		}
+	}
+	s.orgID = org
+
 	// Seed the clock past everything already journalled.
 	var maxHLC sql.NullString
 	_ = db.QueryRow("SELECT MAX(hlc) FROM oplog").Scan(&maxHLC)
@@ -72,6 +93,49 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error   { return s.db.Close() }
 func (s *Store) NodeID() string { return s.nodeID }
+
+// OrgID returns this node's workspace id.
+func (s *Store) OrgID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.orgID
+}
+
+// LocalOpCount returns how many ops this node has authored itself. A node that
+// has authored none is "unadopted" and may still join another workspace.
+func (s *Store) LocalOpCount() (int, error) {
+	var n int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM oplog WHERE node_id = ?", s.nodeID).Scan(&n)
+	return n, err
+}
+
+// AdoptOrg makes this node part of the workspace identified by org. It is only
+// permitted while the node has authored no ops of its own (a fresh install that
+// is pairing into an existing workspace); a node that already has local history
+// keeps its own workspace, so two established workspaces can never silently
+// merge. Returns true if the org was adopted.
+func (s *Store) AdoptOrg(org string) (bool, error) {
+	if org == "" {
+		return false, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if org == s.orgID {
+		return false, nil
+	}
+	var n int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM oplog WHERE node_id = ?", s.nodeID).Scan(&n); err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return false, nil // established node: never re-home
+	}
+	if err := s.SetSetting("org_id", org); err != nil {
+		return false, err
+	}
+	s.orgID = org
+	return true, nil
+}
 
 // SetOnChange registers a callback fired after every committed mutation.
 func (s *Store) SetOnChange(fn func()) { s.onChange = fn }
@@ -168,7 +232,7 @@ func writeRow(tx *sql.Tx, td tableDef, op Op) error {
 
 	names := make([]string, len(td.cols))
 	placeholders := make([]string, len(td.cols))
-	args := []any{op.RowID, op.HLC, boolToInt(op.Deleted)}
+	args := []any{op.RowID, op.HLC, boolToInt(op.Deleted), op.OrgID}
 	for i, c := range td.cols {
 		names[i] = c.name
 		placeholders[i] = "?"
@@ -184,14 +248,14 @@ func writeRow(tx *sql.Tx, td tableDef, op Op) error {
 
 	var stmt string
 	if td.insertOnly {
-		stmt = fmt.Sprintf("INSERT OR IGNORE INTO %s (id, hlc, deleted%s) VALUES (?, ?, ?%s)",
+		stmt = fmt.Sprintf("INSERT OR IGNORE INTO %s (id, hlc, deleted, org_id%s) VALUES (?, ?, ?, ?%s)",
 			td.name, colList, valList)
 	} else {
-		updates := "hlc = excluded.hlc, deleted = excluded.deleted"
+		updates := "hlc = excluded.hlc, deleted = excluded.deleted, org_id = excluded.org_id"
 		for _, n := range names {
 			updates += fmt.Sprintf(", %s = excluded.%s", n, n)
 		}
-		stmt = fmt.Sprintf(`INSERT INTO %s (id, hlc, deleted%s) VALUES (?, ?, ?%s)
+		stmt = fmt.Sprintf(`INSERT INTO %s (id, hlc, deleted, org_id%s) VALUES (?, ?, ?, ?%s)
 			ON CONFLICT(id) DO UPDATE SET %s WHERE excluded.hlc > %s.hlc`,
 			td.name, colList, valList, updates, td.name)
 	}
@@ -201,9 +265,9 @@ func writeRow(tx *sql.Tx, td tableDef, op Op) error {
 
 func appendOplog(tx *sql.Tx, op Op) (bool, error) {
 	res, err := tx.Exec(
-		`INSERT OR IGNORE INTO oplog (hlc, node_id, tbl, row_id, deleted, payload)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		op.HLC, op.NodeID, op.Tbl, op.RowID, boolToInt(op.Deleted), string(op.Payload))
+		`INSERT OR IGNORE INTO oplog (hlc, node_id, org_id, tbl, row_id, deleted, payload)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		op.HLC, op.NodeID, op.OrgID, op.Tbl, op.RowID, boolToInt(op.Deleted), string(op.Payload))
 	if err != nil {
 		return false, err
 	}
@@ -228,7 +292,7 @@ func (s *Store) LocalPut(tbl, rowID string, payload map[string]any, deleted bool
 	if err != nil {
 		return Op{}, err
 	}
-	op := Op{HLC: s.clock.Tick(), NodeID: s.nodeID, Tbl: tbl, RowID: rowID, Deleted: deleted, Payload: raw}
+	op := Op{HLC: s.clock.Tick(), NodeID: s.nodeID, OrgID: s.orgID, Tbl: tbl, RowID: rowID, Deleted: deleted, Payload: raw}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -262,6 +326,12 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 	for _, op := range ops {
 		td, ok := tableByName(op.Tbl)
 		if !ok {
+			continue
+		}
+		// Isolation boundary: never merge another workspace's ops, even if a
+		// shared sync secret let them through the transport. Ops with no org id
+		// (legacy/pre-org data) are accepted and inherit ours implicitly.
+		if op.OrgID != "" && op.OrgID != s.orgID {
 			continue
 		}
 		isNew, err := appendOplog(tx, op)
@@ -311,7 +381,7 @@ func (s *Store) Vector() (map[string]string, error) {
 // up to limit.
 func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error) {
 	rows, err := s.db.Query(
-		"SELECT hlc, node_id, tbl, row_id, deleted, payload FROM oplog ORDER BY hlc ASC")
+		"SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload FROM oplog ORDER BY hlc ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +391,7 @@ func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error
 		var op Op
 		var del int
 		var payload string
-		if err := rows.Scan(&op.HLC, &op.NodeID, &op.Tbl, &op.RowID, &del, &payload); err != nil {
+		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload); err != nil {
 			return nil, err
 		}
 		op.Deleted = del != 0
