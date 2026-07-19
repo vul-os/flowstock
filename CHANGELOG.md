@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Self-describing workspaces**: every synced row and op carries an `org_id`
+  (generated on first run). Cross-workspace ops are rejected on apply and a
+  peer that reports a different workspace is refused, so isolation no longer
+  rests on the shared secret alone. A fresh device *pairs in* by adopting the
+  workspace it joins; an established device never re-homes.
+- **Append-only goods-receipt ledger** (`po_receipts`): a line's received
+  quantity is `SUM(qty)` over immutable receipt rows, so concurrent partial
+  receipts on different branches converge by union instead of a last-writer-wins
+  counter under-counting.
+- **Folder sync transport** ("files as transport, never as truth"): replicate
+  through a shared folder (Dropbox, Google Drive, Syncthing, NAS, USB). Each
+  node writes only its own append-only `ops-<node_id>.jsonl`, so file-sync never
+  conflicts; imports are incremental and idempotent. Includes a Settings path,
+  `POST /api/sync/folder`, and a documented USB/sneakernet workflow.
+- **Oplog compaction**: `POST /api/sync/compact` writes a checksummed, signed
+  `snapshot.json` and prunes ops every enabled peer has acknowledged
+  (conservative — keeps the newest op per node; the version vector never
+  regresses). Snapshots rebuild a late joiner from state.
+- **Per-node Ed25519 identity**: generated on first run; op batches and
+  snapshots are signed and tamper-checked, and peer public keys are recorded on
+  pairing. Shared-secret transport auth is unchanged (key-based transport is a
+  documented next step).
+
+### Changed
+- Synced-table envelope gains `org_id`; `peers` gains `vector` + `pubkey`.
+- `received_quantity` is derived (never stored) and folded out of the schema.
+
 ## [1.0.0] - 2026-07-19
 
 Complete rebuild as a self-hosted, offline-first, decentralized inventory app.

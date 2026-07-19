@@ -59,12 +59,22 @@ branches need to sync across the internet without opening ports.
 - 🏪 **Multi-branch stock ledger** — stock on hand per branch, derived from
   immutable movements (never a mutable counter)
 - 🔄 **Leaderless offline-first sync** — hybrid-logical-clock oplog; catalog
-  merges last-writer-wins, stock movements merge by union; any topology (pair,
-  hub-and-spoke, mesh); authenticated, fail-closed
+  merges last-writer-wins, stock movements + goods receipts merge by union; any
+  topology (pair, hub-and-spoke, mesh); authenticated, fail-closed
+- 🏷️ **Self-describing workspaces** — every row and op carries a workspace
+  `org_id`; cross-workspace ops are rejected, and a new device *pairs in* by
+  adopting the workspace rather than starting its own
+- 📁 **Folder sync (no network needed)** — replicate through Dropbox, Google
+  Drive, Syncthing, a NAS, or a **USB stick** (sneakernet); each device writes
+  only its own append-only file, so file-sync never conflicts
+- 🗜️ **Bounded history** — one-click compaction writes a checksummed, signed
+  snapshot and prunes ops every branch has acknowledged
+- 🔑 **Signed replication** — each node has an Ed25519 identity; op batches and
+  snapshots are signed and tamper-checked (shared-secret transport unchanged)
 - 🧾 **Sales orders** — draft → confirm (deducts stock) → paid; cancelling
   reverses stock; product + service line items
 - 🚚 **Purchasing** — purchase orders with VAT, goods receiving with partial
-  receipts and automatic status progression
+  receipts (an immutable per-receipt ledger) and automatic status progression
 - ↔️ **Adjustments, counts & transfers** — audited movements between branches
 - 💰 **Creditors & debtors** — balances computed from orders, POs and recorded
   payments
@@ -148,12 +158,15 @@ flowchart LR
     CA <-- "HTTP /api/sync (Bearer secret)<br>LAN · VPN · Vulos Relay" --> CB
 ```
 
-Every mutation is journalled to an oplog with a hybrid-logical-clock timestamp.
-Sync exchanges ops (push + pull, batched, idempotent): catalog rows resolve
-last-writer-wins; **stock movements are immutable and merge by union**, which
-is what makes offline multi-branch stock safe. Version vectors are derived from
-the oplog, so sync is stateless and any node can relay any other node's changes.
-Full details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+Every mutation is journalled to an oplog with a hybrid-logical-clock timestamp
+and tagged with the workspace `org_id`. Sync exchanges ops (push + pull,
+batched, idempotent, signed): catalog rows resolve last-writer-wins; **stock
+movements and goods receipts are immutable and merge by union**, which is what
+makes offline multi-branch stock safe. Version vectors are derived from the
+oplog, so sync is stateless and any node can relay any other node's changes.
+The same ops can travel over HTTP **or** a shared folder (Dropbox/Syncthing/USB),
+and one-click compaction snapshots state and prunes acknowledged history. Full
+details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/SYNC.md](docs/SYNC.md).
 
 ## Configuration
@@ -185,9 +198,12 @@ npm run test:go        # Go unit + HTTP sync e2e tests
 npm run screenshots    # regenerate docs/screenshots (Playwright)
 ```
 
-The Go test suite includes a real two-node HTTP sync test covering the
-offline-divergence → reconvergence path (`backend/internal/sync/sync_test.go`)
-and the store's merge/ledger invariants (`backend/internal/store/store_test.go`).
+The Go test suite includes real two-node tests covering the
+offline-divergence → reconvergence path over HTTP and over a shared folder
+(`backend/internal/sync/`), workspace isolation + pairing, concurrent
+goods-receipt convergence, oplog compaction with snapshot rebuild, and the
+signed-batch tamper check, plus the store's merge/ledger invariants
+(`backend/internal/store/`).
 
 ## Contributing
 
