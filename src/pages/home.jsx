@@ -25,6 +25,8 @@ import {
   Pie,
   Cell,
 } from "recharts";
+
+import { useChartTheme } from "@/lib/chart-theme";
 import {
   useWorkspace,
   useTables,
@@ -39,11 +41,6 @@ import {
   movementLedger,
   MOVEMENT_KIND_LABELS,
 } from "@/lib/reports";
-
-// Categorical palette (validated, fixed order) + neutral for "Other".
-const PIE_COLORS = ["#2a78d6", "#008300", "#e87ba4", "#eda100", "#898781"];
-const GRID = "#e1e0d9";
-const AXIS_INK = "#898781";
 
 const KIND_BADGE = {
   receive: "bg-success-muted text-success",
@@ -72,6 +69,7 @@ const fmtDay = (iso) => {
 
 const Dashboard = () => {
   const { businessName, branchName, fmtMoney, currency } = useWorkspace();
+  const chart = useChartTheme();
   const { data, loading } = useTables(
     "products",
     "product_variants",
@@ -294,17 +292,17 @@ const Dashboard = () => {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke={GRID}
+                      stroke={chart.grid}
                       vertical={false}
                     />
                     <XAxis
                       dataKey="label"
-                      tick={{ fill: AXIS_INK, fontSize: 12 }}
-                      axisLine={{ stroke: GRID }}
+                      tick={{ fill: chart.axisInk, fontSize: 12 }}
+                      axisLine={{ stroke: chart.grid }}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fill: AXIS_INK, fontSize: 12 }}
+                      tick={{ fill: chart.axisInk, fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v) =>
@@ -314,12 +312,13 @@ const Dashboard = () => {
                       }
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(11,11,11,0.04)" }}
+                      cursor={{ fill: chart.cursorFill }}
+                      contentStyle={chart.tooltip}
                       formatter={(value) => [fmtMoney(value), "Sales"]}
                     />
                     <Bar
                       dataKey="total"
-                      fill="#2a78d6"
+                      fill={chart.categorical[0]}
                       radius={[4, 4, 0, 0]}
                       maxBarSize={48}
                     />
@@ -354,7 +353,7 @@ const Dashboard = () => {
                       outerRadius={80}
                       dataKey="total"
                       nameKey="name"
-                      stroke="#fcfcfb"
+                      stroke={chart.surface}
                       strokeWidth={2}
                       label={({ name, percent }) =>
                         `${name} ${(percent * 100).toFixed(0)}%`
@@ -363,11 +362,16 @@ const Dashboard = () => {
                       {pieData.map((entry, index) => (
                         <Cell
                           key={entry.name}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                          fill={
+                            chart.categorical[index % chart.categorical.length]
+                          }
                         />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => fmtMoney(value)} />
+                    <Tooltip
+                      contentStyle={chart.tooltip}
+                      formatter={(value) => fmtMoney(value)}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (

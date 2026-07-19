@@ -45,9 +45,7 @@ import {
   MOVEMENT_KIND_LABELS,
 } from "@/lib/reports";
 import { REPORTS } from "./reports-config";
-
-const GRID = "#e1e0d9";
-const AXIS_INK = "#898781";
+import { useChartTheme } from "@/lib/chart-theme";
 
 const KIND_BADGE = {
   receive: "bg-success-muted text-success",
@@ -603,6 +601,7 @@ function LowStockReport({ data, levels, toast }) {
 // ── Sales ────────────────────────────────────────────────────────────────────
 
 function SalesReport({ data, fmtMoney, currency, toast }) {
+  const chart = useChartTheme();
   const { monthly, topProducts, topCustomers } = useMemo(() => {
     const orders = data.orders || [];
     const orderItems = data.order_items || [];
@@ -706,13 +705,13 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke={GRID}
+                      stroke={chart.grid}
                       vertical={false}
                     />
                     <XAxis
                       dataKey="label"
-                      tick={{ fill: AXIS_INK, fontSize: 11 }}
-                      axisLine={{ stroke: GRID }}
+                      tick={{ fill: chart.axisInk, fontSize: 11 }}
+                      axisLine={{ stroke: chart.grid }}
                       tickLine={false}
                       interval={0}
                       angle={-30}
@@ -720,7 +719,7 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                       height={50}
                     />
                     <YAxis
-                      tick={{ fill: AXIS_INK, fontSize: 12 }}
+                      tick={{ fill: chart.axisInk, fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v) =>
@@ -730,12 +729,13 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
                       }
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(11,11,11,0.04)" }}
+                      cursor={{ fill: chart.cursorFill }}
+                      contentStyle={chart.tooltip}
                       formatter={(value) => [fmtMoney(value), "Sales"]}
                     />
                     <Bar
                       dataKey="total"
-                      fill="#2a78d6"
+                      fill={chart.categorical[0]}
                       radius={[4, 4, 0, 0]}
                       maxBarSize={40}
                     />
