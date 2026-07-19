@@ -15,6 +15,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -281,7 +282,7 @@ const BalancesTable = ({
           <TableCell>{party.payment_terms}</TableCell>
           <TableCell className="cell-num">{fmtMoney(invoiced)}</TableCell>
           <TableCell className="cell-num">{fmtMoney(paid)}</TableCell>
-          <TableCell className={`text-right font-medium ${balanceClass}`}>
+          <TableCell className={`cell-num font-medium ${balanceClass}`}>
             {fmtMoney(balance)}
           </TableCell>
           <TableCell className="text-right">
@@ -467,17 +468,20 @@ const CreditorsDebtorsPage = () => {
             <TableBody>
               {recentPayments.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-muted-foreground"
-                  >
-                    No payments recorded yet.
+                  <TableCell colSpan={6} className="p-0">
+                    <EmptyState
+                      title="No payments recorded yet"
+                      description="Record a payment against a creditor or debtor to see it here."
+                      className="border-0 bg-transparent py-10"
+                    />
                   </TableCell>
                 </TableRow>
               )}
               {recentPayments.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell>{(p.payment_date || "").slice(0, 10)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                    {(p.payment_date || "").slice(0, 10)}
+                  </TableCell>
                   <TableCell className="font-medium">
                     {partyName.get(`${p.party_kind}:${p.party_id}`) || "—"}
                   </TableCell>
@@ -493,7 +497,7 @@ const CreditorsDebtorsPage = () => {
                     {p.note}
                   </TableCell>
                   <TableCell
-                    className={`text-right font-medium ${p.direction === "in" ? "text-success" : "text-destructive"}`}
+                    className={`cell-num font-medium ${p.direction === "in" ? "text-success" : "text-destructive"}`}
                   >
                     {fmtMoney(p.amount)}
                   </TableCell>

@@ -196,7 +196,7 @@ const ServicesPage = () => {
                     <TableCell className="max-w-md truncate text-muted-foreground">
                       {s.description || "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="cell-num">
                       {fmtMoney(s.hourly_rate)}/h
                     </TableCell>
                     <TableCell>
