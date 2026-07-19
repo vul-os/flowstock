@@ -175,6 +175,14 @@ export function seedDemoData() {
   });
 
   // ── sales orders across ~10 weeks ─────────────────────────────────────────
+  // Track on-hand per (variant, branch) from everything received so far
+  // (opening stock + PO receipts) so demo sales never drive a branch negative.
+  const onHand = {};
+  tables.stock_movements.forEach((m) => {
+    const k = `${m.variant_id}|${m.branch_id}`;
+    onHand[k] = (onHand[k] || 0) + m.qty_delta;
+  });
+
   const statusFor = (ago) => (ago > 30 ? 'paid' : ago > 7 ? pick(['paid', 'confirmed', 'confirmed']) : pick(['confirmed', 'draft']));
   let orderNo = 101;
   for (let ago = 70; ago >= 0; ago -= between(1, 4)) {
@@ -189,11 +197,19 @@ export function seedDemoData() {
       const v = pick(variants);
       if (chosen.has(v.id)) continue;
       chosen.add(v.id);
-      const qty = v.price > 1000 ? between(1, 2) : between(2, 12);
+      const key = `${v.id}|${branch.id}`;
+      const want = v.price > 1000 ? between(1, 2) : between(2, 12);
+      // Keep a little headroom so nothing sits at exactly zero in the demo.
+      const qty = Math.min(want, Math.max(0, Math.floor((onHand[key] || 0) - 2)));
+      if (qty <= 0) continue;
       subtotal += qty * v.price;
       tables.order_items.push({ id: `${id}-i${li}`, order_id: id, product_variant_id: v.id, quantity: qty, unit_price: v.price, total_price: qty * v.price });
-      if (status !== 'draft') move(v.id, branch.id, -qty, 'sale', 'order', id, daysAgo(ago, 13));
+      if (status !== 'draft') {
+        move(v.id, branch.id, -qty, 'sale', 'order', id, daysAgo(ago, 13));
+        onHand[key] -= qty;
+      }
     }
+    if (chosen.size === 0 || subtotal === 0) continue; // skip an empty order
     if (rand() < 0.25) {
       const svc = pick(services);
       const hours = between(1, 4);
@@ -238,7 +254,7 @@ export function seedDemoData() {
       currency_symbol: 'R',
       tax_rate: 15,
     },
-    sync: { listen: true, port: 7365, bind_addr: '0.0.0.0', secret: 'demo-sync-secret-not-real' },
+    sync: { listen: true, port: '8787', bind_addr: '0.0.0.0', secret: 'demo-sync-secret-not-real' },
     tables,
   };
 }

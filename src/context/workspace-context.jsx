@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, isTauri } from '@/services/api';
+import { api } from '@/services/api';
 
 const WorkspaceContext = createContext(null);
 
@@ -28,7 +28,7 @@ export function WorkspaceProvider({ children }) {
     (n) => {
       const symbol = boot?.currency?.symbol ?? 'R';
       const value = Number(n || 0);
-      return `${symbol} ${value.toLocaleString('en-ZA', {
+      return `${symbol} ${value.toLocaleString('en-ZA', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
@@ -41,7 +41,6 @@ export function WorkspaceProvider({ children }) {
       loading,
       initialized: !!boot?.initialized,
       isDemo: api.isDemo,
-      isTauri,
       businessName: boot?.business_name || '',
       branchId: boot?.branch_id || '',
       branchName: boot?.branch_name || '',

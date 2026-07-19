@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { supabase } from '@/services/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,146 +8,81 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  FormItem,
-  FormLabel,
-  FormControl,
-} from '@/components/ui/form';
+import { FormItem, FormLabel, FormControl } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const OrderItemsTabs = ({ form, organizationId }) => {
-  const [products, setProducts] = useState([]);
-  const [services, setServices] = useState([]);
-
-  useEffect(() => {
-    fetchProducts();
-    fetchServices();
-  }, [organizationId]);
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('product_variants')
-        .select(`
-          *,
-          product:products(
-            name,
-            description
-          )
-        `)
-        .eq('organization_id', organizationId);
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
-  };
-
-  const fetchServices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('organization_id', organizationId);
-      if (error) throw error;
-      setServices(data || []);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-    }
-  };
-
+/**
+ * Product + service line item editors for the order dialog.
+ * `variants` are product_variants joined with product_name; `services` are
+ * service rows. When `disabled` (order no longer draft) everything is
+ * read-only — the backend ignores line item changes for non-draft orders.
+ */
+const OrderItemsTabs = ({ form, variants = [], services = [], fmtMoney, disabled = false }) => {
   const addProduct = () => {
-    const items = form.getValues('order_items');
+    const items = form.getValues('order_items') || [];
     form.setValue('order_items', [
       ...items,
-      {
-        product_variant_id: '',
-        quantity: 1,
-        unit_price: 0,
-        total_price: 0
-      }
+      { product_variant_id: '', quantity: 1, unit_price: 0, total_price: 0 },
     ]);
   };
 
   const addService = () => {
-    const services = form.getValues('order_services');
+    const svcs = form.getValues('order_services') || [];
     form.setValue('order_services', [
-      ...services,
-      {
-        service_id: '',
-        hours: 1,
-        hourly_rate: 0,
-        total_price: 0,
-        description: ''
-      }
+      ...svcs,
+      { service_id: '', hours: 1, hourly_rate: 0, total_price: 0, description: '' },
     ]);
   };
 
   const removeProduct = (index) => {
-    const items = form.getValues('order_items');
-    form.setValue('order_items', items.filter((_, i) => i !== index));
+    const items = form.getValues('order_items') || [];
+    form.setValue(
+      'order_items',
+      items.filter((_, i) => i !== index),
+    );
   };
 
   const removeService = (index) => {
-    const services = form.getValues('order_services');
-    form.setValue('order_services', services.filter((_, i) => i !== index));
+    const svcs = form.getValues('order_services') || [];
+    form.setValue(
+      'order_services',
+      svcs.filter((_, i) => i !== index),
+    );
   };
 
   const updateProduct = (index, field, value) => {
-    const items = form.getValues('order_items');
+    const items = form.getValues('order_items') || [];
     const newItems = [...items];
-    newItems[index] = {
-      ...newItems[index],
-      [field]: value,
-    };
+    newItems[index] = { ...newItems[index], [field]: value };
 
     if (field === 'product_variant_id') {
-      const product = products.find(p => p.id === value);
-      if (product) {
-        newItems[index].unit_price = product.price || 0;
-        newItems[index].total_price = (product.price || 0) * newItems[index].quantity;
+      const variant = variants.find((v) => v.id === value);
+      if (variant) {
+        newItems[index].unit_price = variant.price || 0;
       }
     }
-
-    if (field === 'quantity' || field === 'unit_price') {
-      newItems[index].total_price = newItems[index].quantity * newItems[index].unit_price;
-    }
+    newItems[index].total_price =
+      (newItems[index].quantity || 0) * (newItems[index].unit_price || 0);
 
     form.setValue('order_items', newItems);
   };
 
   const updateService = (index, field, value) => {
-    const services = form.getValues('order_services');
-    const newServices = [...services];
-    newServices[index] = {
-      ...newServices[index],
-      [field]: value,
-    };
+    const svcs = form.getValues('order_services') || [];
+    const newServices = [...svcs];
+    newServices[index] = { ...newServices[index], [field]: value };
 
     if (field === 'service_id') {
-      const service = services.find(s => s.id === value);
+      const service = services.find((s) => s.id === value);
       if (service) {
         newServices[index].hourly_rate = service.hourly_rate || 0;
-        newServices[index].total_price = (service.hourly_rate || 0) * newServices[index].hours;
       }
     }
-
-    if (field === 'hours' || field === 'hourly_rate') {
-      newServices[index].total_price = newServices[index].hours * newServices[index].hourly_rate;
-    }
+    newServices[index].total_price =
+      (newServices[index].hours || 0) * (newServices[index].hourly_rate || 0);
 
     form.setValue('order_services', newServices);
   };
@@ -163,33 +97,38 @@ const OrderItemsTabs = ({ form, organizationId }) => {
       <TabsContent value="products">
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <CardTitle>Products</CardTitle>
-              <Button type="button" variant="outline" onClick={addProduct}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
+              {!disabled && (
+                <Button type="button" variant="outline" onClick={addProduct}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {form.watch('order_items')?.map((item, index) => (
-                <div key={index} className="grid grid-cols-6 gap-4 items-start">
+              {(form.watch('order_items') || []).length === 0 && (
+                <div className="text-sm text-muted-foreground">No products on this order.</div>
+              )}
+              {(form.watch('order_items') || []).map((item, index) => (
+                <div key={item.id || index} className="grid grid-cols-6 items-start gap-4">
                   <div className="col-span-2">
                     <FormLabel>Product</FormLabel>
                     <Select
-                      value={item.product_variant_id}
+                      value={item.product_variant_id || ''}
                       onValueChange={(value) => updateProduct(index, 'product_variant_id', value)}
+                      disabled={disabled}
                     >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select product" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.product.name} - {product.name}
+                        {variants.map((variant) => (
+                          <SelectItem key={variant.id} value={variant.id}>
+                            {variant.product_name} - {variant.name} ({variant.sku}) —{' '}
+                            {fmtMoney(variant.price)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -203,7 +142,10 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                         type="number"
                         min="1"
                         value={item.quantity}
-                        onChange={(e) => updateProduct(index, 'quantity', parseInt(e.target.value) || 0)}
+                        disabled={disabled}
+                        onChange={(e) =>
+                          updateProduct(index, 'quantity', parseInt(e.target.value, 10) || 0)
+                        }
                       />
                     </FormControl>
                   </FormItem>
@@ -216,7 +158,10 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                         min="0"
                         step="0.01"
                         value={item.unit_price}
-                        onChange={(e) => updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        disabled={disabled}
+                        onChange={(e) =>
+                          updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)
+                        }
                       />
                     </FormControl>
                   </FormItem>
@@ -224,24 +169,22 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                   <FormItem>
                     <FormLabel>Total</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        value={item.total_price}
-                        disabled
-                      />
+                      <Input value={fmtMoney(item.total_price)} disabled />
                     </FormControl>
                   </FormItem>
 
-                  <div className="pt-8">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeProduct(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {!disabled && (
+                    <div className="pt-8">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeProduct(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -252,34 +195,38 @@ const OrderItemsTabs = ({ form, organizationId }) => {
       <TabsContent value="services">
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <CardTitle>Services</CardTitle>
-              <Button type="button" variant="outline" onClick={addService}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Service
-              </Button>
+              {!disabled && (
+                <Button type="button" variant="outline" onClick={addService}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Service
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {form.watch('order_services')?.map((service, index) => (
-                <div key={index} className="space-y-4">
-                  <div className="grid grid-cols-6 gap-4 items-start">
+              {(form.watch('order_services') || []).length === 0 && (
+                <div className="text-sm text-muted-foreground">No services on this order.</div>
+              )}
+              {(form.watch('order_services') || []).map((service, index) => (
+                <div key={service.id || index} className="space-y-4">
+                  <div className="grid grid-cols-6 items-start gap-4">
                     <div className="col-span-2">
                       <FormLabel>Service</FormLabel>
                       <Select
-                        value={service.service_id}
+                        value={service.service_id || ''}
                         onValueChange={(value) => updateService(index, 'service_id', value)}
+                        disabled={disabled}
                       >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select service" />
-                          </SelectTrigger>
-                        </FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service" />
+                        </SelectTrigger>
                         <SelectContent>
                           {services.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
-                              {s.name}
+                              {s.name} — {fmtMoney(s.hourly_rate)}/hr
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -294,7 +241,10 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                           min="0.5"
                           step="0.5"
                           value={service.hours}
-                          onChange={(e) => updateService(index, 'hours', parseFloat(e.target.value) || 0)}
+                          disabled={disabled}
+                          onChange={(e) =>
+                            updateService(index, 'hours', parseFloat(e.target.value) || 0)
+                          }
                         />
                       </FormControl>
                     </FormItem>
@@ -307,7 +257,10 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                           min="0"
                           step="0.01"
                           value={service.hourly_rate}
-                          onChange={(e) => updateService(index, 'hourly_rate', parseFloat(e.target.value) || 0)}
+                          disabled={disabled}
+                          onChange={(e) =>
+                            updateService(index, 'hourly_rate', parseFloat(e.target.value) || 0)
+                          }
                         />
                       </FormControl>
                     </FormItem>
@@ -315,31 +268,30 @@ const OrderItemsTabs = ({ form, organizationId }) => {
                     <FormItem>
                       <FormLabel>Total</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          value={service.total_price}
-                          disabled
-                        />
+                        <Input value={fmtMoney(service.total_price)} disabled />
                       </FormControl>
                     </FormItem>
 
-                    <div className="pt-8">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeService(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {!disabled && (
+                      <div className="pt-8">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeService(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
-                  <FormItem className="col-span-5">
+                  <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea
                         value={service.description}
+                        disabled={disabled}
                         onChange={(e) => updateService(index, 'description', e.target.value)}
                         placeholder="Describe the service details..."
                       />

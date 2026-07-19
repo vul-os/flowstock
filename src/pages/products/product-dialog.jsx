@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,92 +18,82 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const ProductDialog = ({
-  open,
-  onOpenChange,
-  selectedProduct,
-  formData,
-  setFormData,
-  categories,
-  onSave,
-}) => {
-  // Reset form when dialog opens/closes or selected product changes
-  useEffect(() => {
-    if (!open) {
-      setFormData({
-        name: '',
-        description: '',
-        category_id: '',
-      });
-    }
-  }, [open, setFormData]);
+const emptyForm = { name: '', description: '', category_id: '' };
 
-  // Update form when selected product changes
+/**
+ * Create / edit a product (name, description, category).
+ * `onSave(payload)` is awaited; the dialog closes itself on success.
+ */
+const ProductDialog = ({ open, onOpenChange, product, categories, onSave }) => {
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    if (selectedProduct && open) {
-      setFormData({
-        name: selectedProduct.name || '',
-        description: selectedProduct.description || '',
-        category_id: selectedProduct.category_id || '',
-      });
+    if (open) {
+      setForm(
+        product
+          ? {
+              name: product.name || '',
+              description: product.description || '',
+              category_id: product.category_id || '',
+            }
+          : emptyForm,
+      );
     }
-  }, [selectedProduct, open, setFormData]);
+  }, [open, product]);
+
+  const isValid = form.name.trim() && form.category_id;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Basic validation
-    if (!formData.name || !formData.category_id) {
-      // You might want to add proper error handling/display here
-      console.error('Name and category are required');
-      return;
-    }
-
+    if (!isValid || saving) return;
+    setSaving(true);
     try {
-      await onSave();
+      await onSave({
+        name: form.name.trim(),
+        description: form.description,
+        category_id: form.category_id,
+      });
       onOpenChange(false);
-    } catch (error) {
-      console.error('Error saving product:', error);
+    } catch {
+      // caller already surfaced the error via toast
+    } finally {
+      setSaving(false);
     }
   };
-
-  const isFormValid = formData.name && formData.category_id;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>
-              {selectedProduct ? 'Edit Product' : 'Add New Product'}
-            </DialogTitle>
+            <DialogTitle>{product ? 'Edit Product' : 'Add New Product'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="product-name">Name</Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                id="product-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Product name"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="product-description">Description</Label>
               <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                id="product-description"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Product description"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label>Category</Label>
               <Select
-                value={formData.category_id}
-                onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                required
+                value={form.category_id}
+                onValueChange={(value) => setForm({ ...form, category_id: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
@@ -119,18 +109,11 @@ const ProductDialog = ({
             </div>
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={!isFormValid}
-            >
-              {selectedProduct ? 'Update' : 'Create'}
+            <Button type="submit" disabled={!isValid || saving}>
+              {saving ? 'Saving…' : product ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>
         </form>

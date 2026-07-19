@@ -1,4 +1,26 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
+import { Plus, Search, Pencil, Trash2, Wrench } from 'lucide-react';
+import { api } from '@/services/api';
+import { useTables, useWorkspace } from '@/context/workspace-context';
+import { toast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -6,353 +28,253 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Search, 
-  ArrowLeft,
-  FilterX,
-  RefreshCw,
-  Loader2
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { supabase } from '@/services/supabaseClient';
-import { toast } from "sonner";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Spinner } from '@/components/ui/spinner';
 
+const emptyForm = { name: '', description: '', hourly_rate: '' };
+
+/**
+ * Services are billable labour lines (repairs, cutting, installation) that can
+ * appear on customer orders and purchase orders. They carry an hourly rate and
+ * never affect stock.
+ */
 const ServicesPage = () => {
-  const [services, setServices] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-  const [open, setOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [editingService, setEditingService] = React.useState(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { data, loading } = useTables('services');
+  const { fmtMoney } = useWorkspace();
+  const services = data.services || [];
 
-  const fetchServices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-      if (error) throw error;
-      setServices(data);
-    } catch (err) {
-      setError(err.message);
-      toast.error('Failed to load services');
-    } finally {
-      setLoading(false);
-    }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter(
+      (s) =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q),
+    );
+  }, [services, search]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   };
 
-  React.useEffect(() => {
-    fetchServices();
-  }, []);
+  const openEdit = (service) => {
+    setEditing(service);
+    setForm({
+      name: service.name || '',
+      description: service.description || '',
+      hourly_rate: service.hourly_rate ?? '',
+    });
+    setDialogOpen(true);
+  };
 
-  const handleAddService = async (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!form.name.trim()) {
+      toast({ description: 'A service name is required.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
     try {
-      const formData = new FormData(e.target);
-      const newService = {
-        name: formData.get('name'),
-        description: formData.get('description'),
-        hourly_rate: parseFloat(formData.get('hourly_rate'))
-      };
-
-      const { error } = await supabase
-        .from('services')
-        .insert([newService]);
-
-      if (error) throw error;
-
-      toast.success('Service added successfully');
-      setOpen(false);
-      fetchServices();
+      await api.putRow('services', editing?.id || null, {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        hourly_rate: Number(form.hourly_rate) || 0,
+        created_at: editing?.created_at || new Date().toISOString(),
+      });
+      toast({ description: editing ? 'Service updated.' : 'Service created.' });
+      setDialogOpen(false);
     } catch (err) {
-      toast.error('Failed to add service: ' + err.message);
+      toast({ description: `Could not save: ${err}`, variant: 'destructive' });
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleEditService = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      const formData = new FormData(e.target);
-      const updatedService = {
-        name: formData.get('name'),
-        description: formData.get('description'),
-        hourly_rate: parseFloat(formData.get('hourly_rate'))
-      };
-
-      const { error } = await supabase
-        .from('services')
-        .update(updatedService)
-        .eq('id', editingService.id);
-
-      if (error) throw error;
-
-      toast.success('Service updated successfully');
-      setEditingService(null);
-      fetchServices();
+      await api.deleteRow('services', deleteTarget.id);
+      toast({ description: `${deleteTarget.name} was removed.` });
     } catch (err) {
-      toast.error('Failed to update service: ' + err.message);
+      toast({ description: `Could not delete: ${err}`, variant: 'destructive' });
     } finally {
-      setIsSubmitting(false);
+      setDeleteTarget(null);
     }
   };
-
-  const handleDeleteService = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this service?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('services')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success('Service deleted successfully');
-      fetchServices();
-    } catch (err) {
-      toast.error('Failed to delete service: ' + err.message);
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-ZA', {
-      style: 'currency',
-      currency: 'ZAR',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  const filteredServices = services.filter(service =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const ServiceForm = ({ service, onSubmit }) => (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="name">Service Name</Label>
-        <Input 
-          id="name" 
-          name="name" 
-          defaultValue={service?.name}
-          required 
-          className="border-neutral-200 focus:border-blue-500 dark:border-neutral-700"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea 
-          id="description" 
-          name="description" 
-          defaultValue={service?.description}
-          className="min-h-[100px] border-neutral-200 focus:border-blue-500 dark:border-neutral-700"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="hourly_rate">Hourly Rate (ZAR)</Label>
-        <Input 
-          id="hourly_rate" 
-          name="hourly_rate" 
-          type="number" 
-          step="0.01" 
-          min="0"
-          defaultValue={service?.hourly_rate}
-          required 
-          className="border-neutral-200 focus:border-blue-500 dark:border-neutral-700"
-        />
-      </div>
-      <Button 
-        type="submit" 
-        className="w-full bg-blue-600 hover:bg-blue-700"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {service ? 'Updating...' : 'Adding...'}
-          </>
-        ) : (
-          service ? 'Update Service' : 'Add Service'
-        )}
-      </Button>
-    </form>
-  );
 
   return (
-    <main className="min-h-screen bg-white dark:bg-neutral-900">
-      <div className="mx-auto max-w-7xl px-8 py-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
-              Services
-            </h1>
-            <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-              Manage your service offerings and rates
-            </p>
-          </div>
-
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" />
-                New Service
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Add New Service</DialogTitle>
-              </DialogHeader>
-              <ServiceForm onSubmit={handleAddService} />
-            </DialogContent>
-          </Dialog>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Services</h1>
+          <p className="text-sm text-muted-foreground">
+            Billable labour you can add to orders and purchase orders.
+          </p>
         </div>
+        <Button onClick={openCreate} className="gap-2">
+          <Plus className="h-4 w-4" /> New service
+        </Button>
+      </div>
 
-        {/* Search and Actions Bar */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+      <Card>
+        <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Service catalog</CardTitle>
+            <CardDescription>{services.length} services</CardDescription>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              className="pl-10"
-              placeholder="Search services..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search services…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
             />
           </div>
-          <div className="flex items-center gap-2">
-            {searchQuery && (
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={() => setSearchQuery('')}
-                className="h-10 w-10"
-              >
-                <FilterX className="h-4 w-4 text-neutral-500" />
-              </Button>
-            )}
-            <Button 
-              variant="outline" 
-              size="icon"
-              className="h-10 w-10"
-              onClick={fetchServices}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 text-neutral-500 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-
-        {/* Services Table */}
-        <div className="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800">
-                <TableHead>Service</TableHead>
-                <TableHead className="max-w-xl">Description</TableHead>
-                <TableHead className="text-right">Hourly Rate</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <Spinner />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+              <Wrench className="h-8 w-8" />
+              <p>{search ? 'No services match your search.' : 'No services yet.'}</p>
+              {!search && (
+                <Button variant="outline" size="sm" onClick={openCreate} className="gap-2">
+                  <Plus className="h-4 w-4" /> Add your first service
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    <div className="flex items-center justify-center py-6">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                    </div>
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Hourly rate</TableHead>
+                  <TableHead className="w-24" />
                 </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6 text-red-600">
-                    Error loading services. Please try again.
-                  </TableCell>
-                </TableRow>
-              ) : filteredServices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6 text-neutral-600">
-                    No services found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredServices.map((service) => (
-                  <TableRow 
-                    key={service.id}
-                    className="border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800"
-                  >
-                    <TableCell className="font-medium text-neutral-900 dark:text-neutral-200">
-                      {service.name}
+              </TableHeader>
+              <TableBody>
+                {filtered.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="max-w-md truncate text-muted-foreground">
+                      {s.description || '—'}
                     </TableCell>
-                    <TableCell className="max-w-xl text-neutral-600 dark:text-neutral-400">
-                      {service.description}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-neutral-900 dark:text-neutral-200">
-                      {formatCurrency(service.hourly_rate)}
+                    <TableCell className="text-right tabular-nums">
+                      {fmtMoney(s.hourly_rate)}/h
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end space-x-1">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setEditingService(service)}
-                            >
-                              <Pencil className="h-4 w-4 text-blue-600" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                              <DialogTitle>Edit Service</DialogTitle>
-                            </DialogHeader>
-                            <ServiceForm 
-                              service={service} 
-                              onSubmit={handleEditService} 
-                            />
-                          </DialogContent>
-                        </Dialog>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleDeleteService(service.id)}
+                          onClick={() => setDeleteTarget(s)}
+                          className="text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="h-4 w-4 text-red-600" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </main>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit service' : 'New service'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={save} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="svc-name">Name</Label>
+              <Input
+                id="svc-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Power tool repair"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="svc-desc">Description</Label>
+              <Textarea
+                id="svc-desc"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="What this service covers"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="svc-rate">Hourly rate</Label>
+              <Input
+                id="svc-rate"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.hourly_rate}
+                onChange={(e) => setForm({ ...form, hourly_rate: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving…' : editing ? 'Save changes' : 'Create service'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete service?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.name} will be removed. Orders that already reference it keep their
+              recorded amounts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 

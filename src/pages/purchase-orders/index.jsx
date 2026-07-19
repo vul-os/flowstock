@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Send, ChevronDown, ChevronRight } from 'lucide-react';
-import { supabase } from '@/services/supabaseClient';
+import React, { useMemo, useState } from 'react';
+import { Plus, FileText, Send, PackageCheck, PencilLine, ChevronDown, ChevronRight } from 'lucide-react';
+import { api } from '@/services/api';
+import { useWorkspace, useTables } from '@/context/workspace-context';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -18,86 +20,101 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import PurchaseOrderDialog from './dialog';
+import ReceiveGoodsDialog from './receive-dialog';
 
-// Currency formatter for South African Rand
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: 2,
-  }).format(amount).replace('ZAR', 'R');
+const STATUS_BADGE = {
+  draft: { variant: 'secondary', className: '' },
+  sent: { variant: 'default', className: '' },
+  partially_received: {
+    variant: 'default',
+    className: 'border-transparent bg-amber-500 text-black hover:bg-amber-500/80',
+  },
+  received: {
+    variant: 'default',
+    className: 'border-transparent bg-emerald-600 text-white hover:bg-emerald-600/80',
+  },
+  cancelled: { variant: 'destructive', className: '' },
 };
 
-const getStatusBadgeVariant = (status) => {
-  const variants = {
-    draft: 'secondary',
-    sent: 'primary',
-    partially_received: 'warning',
-    received: 'success',
-    cancelled: 'destructive',
-  };
-  return variants[status] || 'secondary';
-};
+function StatusBadge({ status }) {
+  const cfg = STATUS_BADGE[status] || STATUS_BADGE.draft;
+  return (
+    <Badge variant={cfg.variant} className={cfg.className}>
+      {(status || 'draft').replace(/_/g, ' ')}
+    </Badge>
+  );
+}
 
-const formatDate = (dateString) => {
-  return dateString ? new Date(dateString).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }) : '';
-};
+const formatDate = (dateString) =>
+  dateString
+    ? new Date(dateString).toLocaleDateString('en-ZA', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : '';
 
-const PurchaseOrdersPage = ({ organizationId }) => {
-  const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+const PurchaseOrdersPage = () => {
+  const { fmtMoney } = useWorkspace();
+  const { toast } = useToast();
+  const { data, loading } = useTables(
+    'purchase_orders',
+    'purchase_order_items',
+    'suppliers',
+    'product_variants',
+    'products',
+    'services',
+    'branches',
+  );
+
   const [expandedOrders, setExpandedOrders] = useState({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [receiveFor, setReceiveFor] = useState(null);
+  const [busyPoId, setBusyPoId] = useState(null);
 
-  const fetchOrders = async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select(`
-          *,
-          supplier:suppliers(name),
-          purchase_order_items(
-            *,
-            product_variant:product_variants(
-              name,
-              sku
-            ),
-            service:services(
-              name,
-              description
-            )
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false });
+  const suppliersById = useMemo(
+    () => new Map((data.suppliers || []).map((s) => [s.id, s])),
+    [data.suppliers],
+  );
+  const branchesById = useMemo(
+    () => new Map((data.branches || []).map((b) => [b.id, b])),
+    [data.branches],
+  );
+  const servicesById = useMemo(
+    () => new Map((data.services || []).map((s) => [s.id, s])),
+    [data.services],
+  );
 
-      if (error) throw error;
-      setOrders(data || []);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-  }, [organizationId]);
-
-  const toggleOrderExpansion = (orderId) => {
-    setExpandedOrders(prev => ({
-      ...prev,
-      [orderId]: !prev[orderId]
+  const variants = useMemo(() => {
+    const productsById = new Map((data.products || []).map((p) => [p.id, p]));
+    return (data.product_variants || []).map((v) => ({
+      ...v,
+      product_name: productsById.get(v.product_id)?.name || 'Unknown product',
     }));
-  };
+  }, [data.product_variants, data.products]);
+  const variantsById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
+
+  const orders = useMemo(
+    () =>
+      [...(data.purchase_orders || [])].sort((a, b) =>
+        (b.created_at || '').localeCompare(a.created_at || ''),
+      ),
+    [data.purchase_orders],
+  );
+  const itemsByPo = useMemo(() => {
+    const m = new Map();
+    (data.purchase_order_items || []).forEach((i) => {
+      if (!m.has(i.purchase_order_id)) m.set(i.purchase_order_id, []);
+      m.get(i.purchase_order_id).push(i);
+    });
+    return m;
+  }, [data.purchase_order_items]);
+
+  const toggleOrderExpansion = (orderId) =>
+    setExpandedOrders((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
 
   const handleCreateOrder = () => {
     setSelectedOrder(null);
@@ -109,71 +126,43 @@ const PurchaseOrdersPage = ({ organizationId }) => {
     setDialogOpen(true);
   };
 
-  const handleSubmitOrder = async (orderData, items) => {
+  const handleStatusChange = async (order, status, description) => {
     try {
-      let orderId;
-      if (selectedOrder) {
-        // Update existing order
-        const { error } = await supabase
-          .from('purchase_orders')
-          .update(orderData)
-          .eq('id', selectedOrder.id);
-        if (error) throw error;
-        orderId = selectedOrder.id;
-
-        // Delete existing items
-        await supabase
-          .from('purchase_order_items')
-          .delete()
-          .eq('purchase_order_id', orderId);
-      } else {
-        // Create new order
-        const { data, error } = await supabase
-          .from('purchase_orders')
-          .insert([{
-            ...orderData,
-            po_number: `PO-${Date.now()}`, // You might want to implement a better PO number generation system
-          }])
-          .select()
-          .single();
-        if (error) throw error;
-        orderId = data.id;
-      }
-
-      // Insert new items
-      const { error: itemsError } = await supabase
-        .from('purchase_order_items')
-        .insert(
-          items.map(item => ({
-            ...item,
-            purchase_order_id: orderId,
-          }))
-        );
-      if (itemsError) throw itemsError;
-
-      await fetchOrders();
-      setDialogOpen(false);
+      setBusyPoId(order.id);
+      await api.setPurchaseOrderStatus(order.id, status);
+      toast({ title: `Purchase order ${order.po_number || ''} ${status}`, description });
     } catch (error) {
-      console.error('Error saving order:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Could not update purchase order',
+        description: String(error?.message || error),
+      });
+    } finally {
+      setBusyPoId(null);
     }
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Spinner />
+      </div>
+    );
   }
 
+  const awaiting = orders.filter((o) => ['sent', 'partially_received'].includes(o.status));
+  const openValue = awaiting.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto space-y-6 py-6">
       {/* Header Section */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Purchase Orders</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage and track your purchase orders
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Purchase Orders</h1>
+          <p className="mt-2 text-muted-foreground">Manage and track your purchase orders</p>
         </div>
         <Button onClick={handleCreateOrder}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Create Order
         </Button>
       </div>
@@ -191,12 +180,33 @@ const PurchaseOrdersPage = ({ organizationId }) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-            <Send className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
+            <PencilLine className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {orders.filter(order => order.status === 'sent').length}
+              {orders.filter((o) => o.status === 'draft').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Awaiting Delivery</CardTitle>
+            <Send className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{awaiting.length}</div>
+            <p className="text-xs text-muted-foreground">{fmtMoney(openValue)} outstanding</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Received</CardTitle>
+            <PackageCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {orders.filter((o) => o.status === 'received').length}
             </div>
           </CardContent>
         </Card>
@@ -206,9 +216,7 @@ const PurchaseOrdersPage = ({ organizationId }) => {
       <Card>
         <CardHeader>
           <CardTitle>Recent Purchase Orders</CardTitle>
-          <CardDescription>
-            View and manage your purchase orders
-          </CardDescription>
+          <CardDescription>View and manage your purchase orders</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -217,6 +225,7 @@ const PurchaseOrdersPage = ({ organizationId }) => {
                 <TableHead></TableHead>
                 <TableHead>PO Number</TableHead>
                 <TableHead>Supplier</TableHead>
+                <TableHead>Branch</TableHead>
                 <TableHead>Order Date</TableHead>
                 <TableHead>Expected Delivery</TableHead>
                 <TableHead>Status</TableHead>
@@ -225,105 +234,172 @@ const PurchaseOrdersPage = ({ organizationId }) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
-                <React.Fragment key={order.id}>
-                  <TableRow>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleOrderExpansion(order.id)}
-                      >
-                        {expandedOrders[order.id] ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="font-medium">{order.po_number}</TableCell>
-                    <TableCell>{order.supplier?.name}</TableCell>
-                    <TableCell>{formatDate(order.order_date)}</TableCell>
-                    <TableCell>{formatDate(order.expected_delivery_date)}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(order.status)}>
-                        {order.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatCurrency(order.total_amount)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+              {orders.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    No purchase orders yet. Create your first purchase order to get started.
+                  </TableCell>
+                </TableRow>
+              )}
+              {orders.map((order) => {
+                const items = itemsByPo.get(order.id) || [];
+                const busy = busyPoId === order.id;
+                return (
+                  <React.Fragment key={order.id}>
+                    <TableRow>
+                      <TableCell>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditOrder(order)}
+                          size="icon"
+                          onClick={() => toggleOrderExpansion(order.id)}
                         >
-                          View Details
+                          {expandedOrders[order.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
                         </Button>
-                        {order.status === 'draft' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditOrder(order)}
-                          >
-                            Edit
+                      </TableCell>
+                      <TableCell className="font-medium">{order.po_number}</TableCell>
+                      <TableCell>
+                        {suppliersById.get(order.supplier_id)?.company_name ||
+                          suppliersById.get(order.supplier_id)?.name ||
+                          'Unknown supplier'}
+                      </TableCell>
+                      <TableCell>{branchesById.get(order.branch_id)?.name || '—'}</TableCell>
+                      <TableCell>{formatDate(order.order_date)}</TableCell>
+                      <TableCell>{formatDate(order.expected_delivery_date)}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={order.status} />
+                      </TableCell>
+                      <TableCell>{fmtMoney(order.total_amount)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditOrder(order)}>
+                            {order.status === 'draft' ? 'Edit' : 'View Details'}
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {expandedOrders[order.id] && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="p-0">
-                        <div className="bg-muted/30 p-4">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Item</TableHead>
-                                <TableHead>Description/SKU</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                <TableHead>Unit Type</TableHead>
-                                <TableHead>Unit Price</TableHead>
-                                <TableHead>Total Price</TableHead>
-                                <TableHead>Received</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {order.purchase_order_items?.map((item) => (
-                                <TableRow key={item.id}>
-                                  <TableCell>
-                                    <Badge variant="outline">
-                                      {item.item_type}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {item.item_type === 'product' 
-                                      ? item.product_variant?.name 
-                                      : item.service?.name}
-                                  </TableCell>
-                                  <TableCell>
-                                    {item.item_type === 'product' 
-                                      ? item.product_variant?.sku 
-                                      : item.description}
-                                  </TableCell>
-                                  <TableCell>{item.quantity}</TableCell>
-                                  <TableCell>{item.unit_type}</TableCell>
-                                  <TableCell>{formatCurrency(item.unit_price)}</TableCell>
-                                  <TableCell>{formatCurrency(item.total_price)}</TableCell>
-                                  <TableCell>
-                                    {item.item_type === 'product' ? (item.received_quantity || 0) : '-'}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                          {order.status === 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                handleStatusChange(order, 'sent', 'Ready to receive goods against it.')
+                              }
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              Send
+                            </Button>
+                          )}
+                          {['sent', 'partially_received'].includes(order.status) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => setReceiveFor(order)}
+                            >
+                              <PackageCheck className="mr-2 h-4 w-4" />
+                              Receive goods
+                            </Button>
+                          )}
+                          {['draft', 'sent'].includes(order.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              disabled={busy}
+                              onClick={() => handleStatusChange(order, 'cancelled')}
+                            >
+                              Cancel
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
-                  )}
-                </React.Fragment>
-              ))}
+                    {expandedOrders[order.id] && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="p-0">
+                          <div className="bg-muted/30 p-4">
+                            {items.length === 0 ? (
+                              <div className="text-sm text-muted-foreground">
+                                No line items on this purchase order.
+                              </div>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Description/SKU</TableHead>
+                                    <TableHead>Quantity</TableHead>
+                                    <TableHead>Unit Type</TableHead>
+                                    <TableHead>Unit Price</TableHead>
+                                    <TableHead>Total Price</TableHead>
+                                    <TableHead>Received</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {items.map((item) => {
+                                    const isProduct = (item.item_type || 'product') === 'product';
+                                    const variant = variantsById.get(item.product_variant_id);
+                                    const received = item.received_quantity || 0;
+                                    const ordered = item.quantity || 0;
+                                    const pct =
+                                      ordered > 0
+                                        ? Math.min(100, Math.round((received / ordered) * 100))
+                                        : 0;
+                                    return (
+                                      <TableRow key={item.id}>
+                                        <TableCell>
+                                          <Badge variant="outline">{item.item_type}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          {isProduct
+                                            ? variant
+                                              ? `${variant.product_name} - ${variant.name}`
+                                              : 'Unknown product'
+                                            : servicesById.get(item.service_id)?.name ||
+                                              'Unknown service'}
+                                        </TableCell>
+                                        <TableCell>
+                                          {isProduct ? variant?.sku || '—' : item.description}
+                                        </TableCell>
+                                        <TableCell>{item.quantity}</TableCell>
+                                        <TableCell>{item.unit_type}</TableCell>
+                                        <TableCell>{fmtMoney(item.unit_price)}</TableCell>
+                                        <TableCell>{fmtMoney(item.total_price)}</TableCell>
+                                        <TableCell>
+                                          {isProduct ? (
+                                            <div className="min-w-[110px]">
+                                              <div className="text-sm">
+                                                {received} / {ordered}
+                                              </div>
+                                              <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
+                                                <div
+                                                  className={`h-1.5 rounded-full ${
+                                                    pct >= 100 ? 'bg-emerald-600' : 'bg-amber-500'
+                                                  }`}
+                                                  style={{ width: `${pct}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            '—'
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -333,8 +409,18 @@ const PurchaseOrdersPage = ({ organizationId }) => {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         order={selectedOrder}
-        organizationId={organizationId}
-        onSubmit={handleSubmitOrder}
+        orderItems={selectedOrder ? itemsByPo.get(selectedOrder.id) || [] : []}
+        suppliers={data.suppliers || []}
+        variants={variants}
+        services={data.services || []}
+      />
+
+      <ReceiveGoodsDialog
+        open={!!receiveFor}
+        onClose={() => setReceiveFor(null)}
+        order={receiveFor}
+        items={receiveFor ? itemsByPo.get(receiveFor.id) || [] : []}
+        variantsById={variantsById}
       />
     </div>
   );

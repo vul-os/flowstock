@@ -1,17 +1,201 @@
-# ReactJS + Vite + ShadcnUI
+<div align="center">
 
-This Starterkit provides a fresh react application using ShadcnUI
+<img src="src/assets/flowstock-logo.svg" alt="FlowStock" width="96" height="96">
 
-## Instalation
+# FlowStock
+
+**Offline-first inventory for multi-branch businesses.**<br>
+Products, stock, orders, purchasing, and accounts — in one self-hosted binary
+that keeps every branch in sync, even when branches go offline.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://golang.org)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+
+<sub>Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
+
+*Vulos — rooted in **vula**, the Zulu and Xhosa word for **open**.*
+
+![FlowStock dashboard](docs/screenshots/hero.png)
+
+</div>
+
+---
+
+## What is FlowStock?
+
+FlowStock is a free, open-source inventory and stock-control app for small
+multi-branch businesses — shops, hardware stores, wholesalers, workshops. It is
+a **single Go binary** that serves a web UI and stores everything in a local
+SQLite database: no cloud account, no subscription, no external services. Each
+branch runs its own copy, works fully offline, and syncs **peer-to-peer** with
+the other branches over the LAN, a VPN, or a tunnel whenever they can reach
+each other. There is no central server. Stock is an append-only ledger, so
+branches that traded while disconnected always converge to the same totals.
+
+## Part of VulOS
+
+**Vulos = free, open-source software + two paid services.** The Vulos OS, all
+its apps, and the app store are OSS and free — you self-host them on a box you
+provision and pay for yourself; Vulos bills only for **Vulos Relay**
+(reachability) and **backup storage**. There is no compute, mail, or app-store
+billing.
+
+The suite: **Vulos OS** (the web-native desktop shell) · **Vulos Office**
+(docs, sheets, slides, PDF, whiteboards) · **Vulos Files** · **Vulos Relay** ·
+**llmux** (sovereign AI gateway) — with mail/calendar/contacts as bring-your-own
+via **lilmail**, and chat/video over established third-party protocols
+(Matrix/Element, Jitsi).
+
+FlowStock runs standalone **and** is hosted as an app by the Vulos OS (embedded
+via `frame_ancestors`). It pairs naturally with a **Vulos Relay** tunnel when
+branches need to sync across the internet without opening ports.
+
+## Features
+
+- 📦 **Products & variations** — categories, SKUs, price + cost price,
+  attributes, reorder points
+- 🏪 **Multi-branch stock ledger** — stock on hand per branch, derived from
+  immutable movements (never a mutable counter)
+- 🔄 **Leaderless offline-first sync** — hybrid-logical-clock oplog; catalog
+  merges last-writer-wins, stock movements merge by union; any topology (pair,
+  hub-and-spoke, mesh); authenticated, fail-closed
+- 🧾 **Sales orders** — draft → confirm (deducts stock) → paid; cancelling
+  reverses stock; product + service line items
+- 🚚 **Purchasing** — purchase orders with VAT, goods receiving with partial
+  receipts and automatic status progression
+- ↔️ **Adjustments, counts & transfers** — audited movements between branches
+- 💰 **Creditors & debtors** — balances computed from orders, POs and recorded
+  payments
+- 📊 **Real dashboard & reports** — sales, valuation, movements, low stock,
+  accounts; CSV export everywhere
+- 🧪 **Demo mode** — the UI runs in a plain browser with seeded data
+  (`npm run dev`), so you can try everything with zero setup
+- 🌓 Light & dark themes; single ~15 MB binary; runs on a laptop, server, NAS
+  or Raspberry Pi
+
+## Screenshots
+
+<table>
+<tr>
+<td><img src="docs/screenshots/stock.png" alt="Stock on hand per branch with movement ledger" width="400"><br><em>Stock — per-branch matrix + movement ledger</em></td>
+<td><img src="docs/screenshots/products.png" alt="Product catalog with variants and low-stock badges" width="400"><br><em>Products & variations</em></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/orders.png" alt="Customer orders with stock-affecting confirmation" width="400"><br><em>Orders — confirming deducts stock</em></td>
+<td><img src="docs/screenshots/purchase_orders.png" alt="Purchase orders with goods receiving" width="400"><br><em>Purchasing — receive goods, partial receipts</em></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/creditors_debtors.png" alt="Creditors and debtors balances with payments" width="400"><br><em>Creditors & debtors + payments</em></td>
+<td><img src="docs/screenshots/report_valuation.png" alt="Inventory valuation report" width="400"><br><em>Reports with CSV export</em></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/settings.png" alt="Decentralized branch sync settings with peers" width="400"><br><em>Branch sync — peers, shared secret, status</em></td>
+<td><img src="docs/screenshots/dark/hero.png" alt="Dashboard in dark theme" width="400"><br><em>Dark theme</em></td>
+</tr>
+</table>
+
+## Quick start (standalone)
+
+**Docker:**
 
 ```bash
-git clone https://github.com/mariio46/shadcn-reactjsx-starterkit.git
+docker run -p 8787:8787 -v flowstock-data:/data \
+  -e FLOWSTOCK_HOST=0.0.0.0 -e FLOWSTOCK_DATA_DIR=/data \
+  ghcr.io/vul-os/flowstock:latest
 ```
 
-```bash
-cd project
-```
+**Binary** — download from [Releases](https://github.com/vul-os/flowstock/releases):
 
 ```bash
-npm i && npm run dev
+./flowstock          # serves http://127.0.0.1:8787
 ```
+
+**From source** (Go 1.25+, Node 18+):
+
+```bash
+git clone https://github.com/vul-os/flowstock.git
+cd flowstock
+npm install
+npm run build:all    # builds the single ./flowstock binary (frontend embedded)
+./flowstock
+```
+
+**Zero-setup demo** (browser only, seeded data):
+
+```bash
+npm install && npm run dev    # → http://localhost:5173
+```
+
+**Connect a second branch:** run each with `FLOWSTOCK_HOST=0.0.0.0`, set the
+same sync secret on both (Settings → Sync), add the other's URL
+(`http://<host>:8787`) as a peer, *Sync now*. Details in
+[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph JHB["Branch A — Johannesburg"]
+        UA[Browser UI] --> CA[Go binary]
+        CA --> DA[(SQLite + oplog)]
+    end
+    subgraph CPT["Branch B — Cape Town"]
+        UB[Browser UI] --> CB[Go binary]
+        CB --> DB[(SQLite + oplog)]
+    end
+    CA <-- "HTTP /api/sync (Bearer secret)<br>LAN · VPN · Vulos Relay" --> CB
+```
+
+Every mutation is journalled to an oplog with a hybrid-logical-clock timestamp.
+Sync exchanges ops (push + pull, batched, idempotent): catalog rows resolve
+last-writer-wins; **stock movements are immutable and merge by union**, which
+is what makes offline multi-branch stock safe. Version vectors are derived from
+the oplog, so sync is stateless and any node can relay any other node's changes.
+Full details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/SYNC.md](docs/SYNC.md).
+
+## Configuration
+
+Zero-config by default. Optional `flowstock.config.json` or env vars set the
+port, bind host, data directory, an owner password, and `frame_ancestors` (for
+Vulos OS embedding). Business, branches and sync are configured in-app. See
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | install, first run, connecting branches, backups |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Go binary, data model, oplog & clocks, sync protocol |
+| [docs/SYNC.md](docs/SYNC.md) | topologies, security, merge semantics, conflict examples |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | every setting + environment variables |
+| [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | regenerating the README screenshots |
+
+## Development
+
+```bash
+npm run dev            # UI only, browser + demo data (port 5173)
+npm run dev:app        # Go server proxying to the Vite dev server
+npm run build          # frontend production build
+npm run build:all      # single embedded binary
+npm run lint           # eslint
+npm run test:go        # Go unit + HTTP sync e2e tests
+npm run screenshots    # regenerate docs/screenshots (Playwright)
+```
+
+The Go test suite includes a real two-node HTTP sync test covering the
+offline-divergence → reconvergence path (`backend/internal/sync/sync_test.go`)
+and the store's merge/ledger invariants (`backend/internal/store/store_test.go`).
+
+## Contributing
+
+Issues and PRs are welcome. Keep changes small and focused; run `npm run
+test:go` and `npm run lint` before submitting. For anything protocol-level
+(oplog, merge rules, sync endpoints), open an issue first — on-disk and on-wire
+compatibility matters.
+
+## License
+
+[MIT](LICENSE)

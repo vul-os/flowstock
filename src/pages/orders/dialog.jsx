@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { supabase } from '@/services/supabaseClient';
+import { api } from '@/services/api';
+import { useWorkspace } from '@/context/workspace-context';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,131 +27,137 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { 
-  Card,
-  CardContent,
-} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import OrderItemsTabs from './items';
 
-// Currency formatter
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: 2,
-  }).format(amount).replace('ZAR', 'R');
-};
+const today = () => new Date().toISOString().split('T')[0];
 
-const OrderDialog = ({ 
-  open, 
-  onClose, 
-  order = null, 
-  organizationId,
-  onSubmit 
+const OrderDialog = ({
+  open,
+  onClose,
+  order = null,
+  orderItems = [],
+  orderServices = [],
+  customers = [],
+  variants = [],
+  services = [],
 }) => {
-  const [customers, setCustomers] = useState([]);
+  const { fmtMoney } = useWorkspace();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Line items may only be changed while the order is a draft.
+  const locked = !!order && order.status !== 'draft';
 
   const form = useForm({
     defaultValues: {
       customer_id: '',
-      payment_terms: '',
+      order_date: today(),
       due_date: '',
-      status: 'draft',
+      payment_terms: '',
+      notes: '',
       order_items: [],
       order_services: [],
-      notes: ''
-    }
+    },
   });
 
   useEffect(() => {
-    if (open) {
-      fetchCustomers();
-      
-      if (order) {
-        form.reset({
-          customer_id: order.customer_id,
-          payment_terms: order.payment_terms || '',
-          due_date: order.due_date?.split('T')[0] || '',
-          status: order.status || 'draft',
-          notes: order.notes || '',
-          order_items: order.order_items || [],
-          order_services: order.order_services || []
-        });
-      } else {
-        form.reset({
-          customer_id: '',
-          payment_terms: '',
-          due_date: '',
-          status: 'draft',
-          notes: '',
-          order_items: [],
-          order_services: []
-        });
-      }
+    if (!open) return;
+    if (order) {
+      form.reset({
+        customer_id: order.customer_id || '',
+        order_date: order.order_date?.split('T')[0] || today(),
+        due_date: order.due_date?.split('T')[0] || '',
+        payment_terms: order.payment_terms || '',
+        notes: order.notes || '',
+        order_items: orderItems.map((i) => ({
+          id: i.id,
+          product_variant_id: i.product_variant_id || '',
+          quantity: i.quantity || 0,
+          unit_price: i.unit_price || 0,
+          total_price: i.total_price || 0,
+        })),
+        order_services: orderServices.map((s) => ({
+          id: s.id,
+          service_id: s.service_id || '',
+          hours: s.hours || 0,
+          hourly_rate: s.hourly_rate || 0,
+          total_price: s.total_price || 0,
+          description: s.description || '',
+        })),
+      });
+    } else {
+      form.reset({
+        customer_id: '',
+        order_date: today(),
+        due_date: '',
+        payment_terms: '',
+        notes: '',
+        order_items: [],
+        order_services: [],
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order]);
 
-  const fetchCustomers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('organization_id', organizationId);
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    }
-  };
-
-  const calculateTotals = () => {
-    const items = form.getValues('order_items');
-    const services = form.getValues('order_services');
-    
-    const itemsTotal = items.reduce((sum, item) => sum + (item.total_price || 0), 0);
-    const servicesTotal = services.reduce((sum, service) => sum + (service.total_price || 0), 0);
-    
-    const subtotal = itemsTotal + servicesTotal;
-    const total = subtotal;
-
-    return {
-      itemsTotal,
-      servicesTotal,
-      subtotal,
-      total
-    };
-  };
+  const watchedItems = form.watch('order_items') || [];
+  const watchedServices = form.watch('order_services') || [];
+  const itemsTotal = watchedItems.reduce((sum, item) => sum + (item.total_price || 0), 0);
+  const servicesTotal = watchedServices.reduce((sum, svc) => sum + (svc.total_price || 0), 0);
+  const subtotal = itemsTotal + servicesTotal;
+  const total = subtotal; // sales orders carry no tax
 
   const handleSubmit = async (data) => {
+    if (!data.customer_id) {
+      form.setError('customer_id', { message: 'Customer is required' });
+      return;
+    }
     try {
       setIsSubmitting(true);
-      const totals = calculateTotals();
-
-      const orderData = {
-        customer_id: data.customer_id,
-        organization_id: organizationId,
-        payment_terms: data.payment_terms,
-        due_date: data.due_date,
-        status: data.status,
-        total_amount: totals.total,
-        notes: data.notes,
+      const payload = {
+        order: {
+          ...(order?.id ? { id: order.id } : {}),
+          customer_id: data.customer_id,
+          order_date: data.order_date,
+          due_date: data.due_date,
+          payment_terms: data.payment_terms,
+          subtotal,
+          total_amount: total,
+          notes: data.notes,
+        },
       };
-
-      if (order?.id) {
-        orderData.id = order.id;
+      if (!locked) {
+        payload.items = data.order_items
+          .filter((i) => i.product_variant_id)
+          .map((i) => ({
+            ...(i.id ? { id: i.id } : {}),
+            product_variant_id: i.product_variant_id,
+            quantity: i.quantity || 0,
+            unit_price: i.unit_price || 0,
+            total_price: i.total_price || 0,
+          }));
+        payload.services = data.order_services
+          .filter((s) => s.service_id)
+          .map((s) => ({
+            ...(s.id ? { id: s.id } : {}),
+            service_id: s.service_id,
+            hours: s.hours || 0,
+            hourly_rate: s.hourly_rate || 0,
+            total_price: s.total_price || 0,
+            description: s.description || '',
+          }));
       }
-
-      await onSubmit(orderData, {
-        order_items: data.order_items,
-        order_services: data.order_services
-      });
-
+      const saved = await api.saveOrder(payload);
+      toast({ title: order ? 'Order updated' : 'Order created', description: saved?.order_number });
       onClose();
     } catch (error) {
-      console.error('Error submitting order:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Could not save order',
+        description: String(error?.message || error),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -157,11 +165,22 @@ const OrderDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{order ? 'Edit Order' : 'Create Order'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            {order ? `Order ${order.order_number || ''}` : 'Create Order'}
+            {order && (
+              <Badge variant={order.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                {order.status}
+              </Badge>
+            )}
+          </DialogTitle>
           <DialogDescription>
-            {order ? 'Update the order details below' : 'Add a new order with products and services'}
+            {order
+              ? locked
+                ? 'This order is no longer a draft — line items are locked. Use the status buttons on the list to move it along.'
+                : 'Update the order details below'
+              : 'Add a new order with products and services'}
           </DialogDescription>
         </DialogHeader>
 
@@ -174,10 +193,7 @@ const OrderDialog = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Customer</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select customer" />
@@ -187,35 +203,9 @@ const OrderDialog = ({
                         {customers.map((customer) => (
                           <SelectItem key={customer.id} value={customer.id}>
                             {customer.name}
+                            {customer.company_name ? ` — ${customer.company_name}` : ''}
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -239,6 +229,20 @@ const OrderDialog = ({
 
               <FormField
                 control={form.control}
+                name="order_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Order Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="due_date"
                 render={({ field }) => (
                   <FormItem>
@@ -252,27 +256,42 @@ const OrderDialog = ({
               />
             </div>
 
-            <OrderItemsTabs 
-              form={form} 
-              organizationId={organizationId}
+            <OrderItemsTabs
+              form={form}
+              variants={variants}
+              services={services}
+              fmtMoney={fmtMoney}
+              disabled={locked}
             />
 
-            <div className="flex justify-between items-center border-t pt-4">
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Add any notes for this order..." />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex items-center justify-between border-t pt-4">
               <div className="text-sm text-muted-foreground">
-                Order #{order?.id ? order.id.split('-')[0] : 'New'}
+                Order #{order?.order_number || 'New'}
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground">
-                    Products Total: {formatCurrency(calculateTotals().itemsTotal)}
+                    Products Total: {fmtMoney(itemsTotal)}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Services Total: {formatCurrency(calculateTotals().servicesTotal)}
+                    Services Total: {fmtMoney(servicesTotal)}
                   </div>
                   <Separator className="my-2" />
-                  <div className="font-medium">
-                    Total: {formatCurrency(calculateTotals().total)}
-                  </div>
+                  <div className="font-medium">Total: {fmtMoney(total)}</div>
                 </div>
                 <Button type="submit" disabled={isSubmitting}>
                   {order ? 'Update Order' : 'Create Order'}

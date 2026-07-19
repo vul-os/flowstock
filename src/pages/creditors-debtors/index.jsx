@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from '@/services/supabaseClient';
-import { 
+import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { api } from '@/services/api';
+import { useTables, useWorkspace } from '@/context/workspace-context';
+import { partyBalances } from '@/lib/reports';
+import { toast } from '@/components/ui/use-toast';
+import {
   Table,
   TableBody,
   TableCell,
@@ -9,65 +13,316 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AuthContext } from "@/context/use-auth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-const CreditorsDebtorsPage = () => {
-  const { activeOrganization } = useContext(AuthContext);
-  const [parties, setParties] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [totals, setTotals] = useState({
-    totalCreditors: 0,
-    totalDebtors: 0
-  });
+const METHODS = [
+  { value: 'eft', label: 'EFT' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'other', label: 'Other' },
+];
 
+const methodLabel = (m) => METHODS.find((x) => x.value === m)?.label || m || '—';
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Record a customer receipt (direction in) or supplier payment (direction out). */
+const RecordPaymentDialog = ({ open, onClose, preset, customers, suppliers }) => {
+  const [kind, setKind] = useState('customer');
+  const [partyId, setPartyId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(today());
+  const [method, setMethod] = useState('eft');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Re-initialise the form each time the dialog opens.
   useEffect(() => {
-    if (activeOrganization?.id) {
-      fetchParties();
+    if (open) {
+      setKind(preset?.kind || 'customer');
+      setPartyId(preset?.party?.id || '');
+      setAmount(preset?.balance != null ? String(preset.balance.toFixed(2)) : '');
+      setPaymentDate(today());
+      setMethod('eft');
+      setNote('');
     }
-  }, [activeOrganization]);
+  }, [open, preset]);
 
-  const fetchParties = async () => {
+  const isCustomer = kind === 'customer';
+  const parties = isCustomer ? customers : suppliers;
+  const locked = !!preset;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const value = Number(amount);
+    if (!partyId) {
+      toast({ title: 'Error', description: 'Choose a party first.', variant: 'destructive' });
+      return;
+    }
+    if (!(value > 0)) {
+      toast({ title: 'Error', description: 'Amount must be greater than zero.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
     try {
-      const { data, error } = await supabase
-        .from('party_balances')
-        .select('*')
-        .eq('organization_id', activeOrganization.id)
-        .order('name');
-
-      if (error) throw error;
-
-      // Calculate totals
-      const totalCreditors = data
-        .filter(p => p.balance > 0)
-        .reduce((sum, p) => sum + Number(p.balance), 0);
-      
-      const totalDebtors = data
-        .filter(p => p.balance < 0)
-        .reduce((sum, p) => sum + Math.abs(Number(p.balance)), 0);
-
-      setParties(data);
-      setTotals({ totalCreditors, totalDebtors });
+      await api.putRow('payments', null, {
+        party_kind: kind,
+        party_id: partyId,
+        direction: isCustomer ? 'in' : 'out',
+        amount: value,
+        payment_date: paymentDate,
+        method,
+        note,
+        created_at: new Date().toISOString(),
+      });
+      toast({
+        title: 'Payment recorded',
+        description: isCustomer ? 'Customer receipt saved.' : 'Supplier payment saved.',
+      });
+      onClose();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch data: " + error.message,
-        variant: "destructive",
+        title: 'Error',
+        description: `Failed to record payment: ${error.message || error}`,
+        variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setSaving(false);
     }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
   };
 
   return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record payment</DialogTitle>
+          <DialogDescription>
+            {isCustomer
+              ? 'Money received from a customer (reduces what they owe you).'
+              : 'Money paid to a supplier (reduces what you owe them).'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Type</Label>
+              <Select value={kind} onValueChange={(v) => { setKind(v); setPartyId(''); }} disabled={locked}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer receipt</SelectItem>
+                  <SelectItem value="supplier">Supplier payment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{isCustomer ? 'Customer' : 'Supplier'}</Label>
+              <Select value={partyId} onValueChange={setPartyId} disabled={locked}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {parties.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="pay-amount">Amount</Label>
+              <Input
+                id="pay-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="pay-date">Payment date</Label>
+              <Input
+                id="pay-date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Method</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="pay-note">Note</Label>
+              <Textarea id="pay-note" value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Record payment'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const BalancesTable = ({ rows, emptyText, balanceClass, fmtMoney, onRecord }) => (
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Name</TableHead>
+        <TableHead>Contact</TableHead>
+        <TableHead>Payment Terms</TableHead>
+        <TableHead className="text-right">Invoiced</TableHead>
+        <TableHead className="text-right">Paid</TableHead>
+        <TableHead className="text-right">Balance</TableHead>
+        <TableHead className="text-right">Actions</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {rows.length === 0 && (
+        <TableRow>
+          <TableCell colSpan={7} className="text-center text-muted-foreground">
+            {emptyText}
+          </TableCell>
+        </TableRow>
+      )}
+      {rows.map(({ party, balance, invoiced, paid }) => (
+        <TableRow key={party.id}>
+          <TableCell className="font-medium">
+            {party.name}
+            {party.company_name ? (
+              <div className="text-sm text-muted-foreground">{party.company_name}</div>
+            ) : null}
+          </TableCell>
+          <TableCell>
+            <div>{party.email}</div>
+            <div className="text-sm text-muted-foreground">{party.phone}</div>
+          </TableCell>
+          <TableCell>{party.payment_terms}</TableCell>
+          <TableCell className="text-right">{fmtMoney(invoiced)}</TableCell>
+          <TableCell className="text-right">{fmtMoney(paid)}</TableCell>
+          <TableCell className={`text-right font-medium ${balanceClass}`}>
+            {fmtMoney(balance)}
+          </TableCell>
+          <TableCell className="text-right">
+            <Button variant="outline" size="sm" onClick={() => onRecord(party, balance)}>
+              Record payment
+            </Button>
+          </TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+);
+
+const CreditorsDebtorsPage = () => {
+  const { fmtMoney } = useWorkspace();
+  const { data, loading } = useTables(
+    'customers',
+    'suppliers',
+    'orders',
+    'purchase_orders',
+    'payments',
+  );
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [preset, setPreset] = useState(null);
+
+  const customers = useMemo(() => data.customers || [], [data.customers]);
+  const suppliers = useMemo(() => data.suppliers || [], [data.suppliers]);
+  const payments = useMemo(() => data.payments || [], [data.payments]);
+
+  const balances = useMemo(
+    () =>
+      partyBalances({
+        orders: data.orders || [],
+        purchaseOrders: data.purchase_orders || [],
+        payments,
+        customers,
+        suppliers,
+      }),
+    [data.orders, data.purchase_orders, payments, customers, suppliers],
+  );
+
+  const partyName = useMemo(() => {
+    const map = new Map();
+    customers.forEach((c) => map.set(`customer:${c.id}`, c.name));
+    suppliers.forEach((s) => map.set(`supplier:${s.id}`, s.name));
+    return map;
+  }, [customers, suppliers]);
+
+  const recentPayments = useMemo(
+    () =>
+      [...payments]
+        .sort((a, b) =>
+          (b.created_at || b.payment_date || '').localeCompare(a.created_at || a.payment_date || ''),
+        )
+        .slice(0, 10),
+    [payments],
+  );
+
+  const openDialog = (presetValue) => {
+    setPreset(presetValue);
+    setDialogOpen(true);
+  };
+
+  if (loading) {
+    return <div className="p-6 text-muted-foreground">Loading…</div>;
+  }
+
+  return (
     <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Creditors &amp; Debtors</h1>
+          <p className="text-muted-foreground mt-2">
+            Outstanding balances and payment recording
+          </p>
+        </div>
+        <Button onClick={() => openDialog(null)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Record payment
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
@@ -75,7 +330,10 @@ const CreditorsDebtorsPage = () => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-red-600">
-              {formatCurrency(totals.totalCreditors)}
+              {fmtMoney(balances.total_payable)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Owed to {balances.creditors.length} supplier{balances.creditors.length === 1 ? '' : 's'}
             </p>
           </CardContent>
         </Card>
@@ -85,7 +343,10 @@ const CreditorsDebtorsPage = () => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(totals.totalDebtors)}
+              {fmtMoney(balances.total_receivable)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Owed by {balances.debtors.length} customer{balances.debtors.length === 1 ? '' : 's'}
             </p>
           </CardContent>
         </Card>
@@ -93,7 +354,7 @@ const CreditorsDebtorsPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Accounts Payable & Receivable</CardTitle>
+          <CardTitle>Accounts Payable &amp; Receivable</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="creditors">
@@ -101,73 +362,90 @@ const CreditorsDebtorsPage = () => {
               <TabsTrigger value="creditors">Creditors</TabsTrigger>
               <TabsTrigger value="debtors">Debtors</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="creditors">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Payment Terms</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parties
-                    .filter(party => party.balance > 0)
-                    .map((party) => (
-                      <TableRow key={party.id}>
-                        <TableCell className="font-medium">{party.name}</TableCell>
-                        <TableCell>{party.party_type === 'supplier' ? 'Supplier' : 'Customer'}</TableCell>
-                        <TableCell>
-                          {party.email}<br/>
-                          {party.phone}
-                        </TableCell>
-                        <TableCell>{party.payment_terms}</TableCell>
-                        <TableCell className="text-right font-medium text-red-600">
-                          {formatCurrency(party.balance)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+              <BalancesTable
+                rows={balances.creditors}
+                emptyText="Nothing owed to suppliers."
+                balanceClass="text-red-600"
+                fmtMoney={fmtMoney}
+                onRecord={(party, balance) =>
+                  openDialog({ kind: 'supplier', party, balance: Math.max(balance, 0) })
+                }
+              />
             </TabsContent>
 
             <TabsContent value="debtors">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Payment Terms</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parties
-                    .filter(party => party.balance < 0)
-                    .map((party) => (
-                      <TableRow key={party.id}>
-                        <TableCell className="font-medium">{party.name}</TableCell>
-                        <TableCell>{party.party_type === 'supplier' ? 'Supplier' : 'Customer'}</TableCell>
-                        <TableCell>
-                          {party.email}<br/>
-                          {party.phone}
-                        </TableCell>
-                        <TableCell>{party.payment_terms}</TableCell>
-                        <TableCell className="text-right font-medium text-green-600">
-                          {formatCurrency(Math.abs(party.balance))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+              <BalancesTable
+                rows={balances.debtors}
+                emptyText="No customers owe you money."
+                balanceClass="text-green-600"
+                fmtMoney={fmtMoney}
+                onRecord={(party, balance) =>
+                  openDialog({ kind: 'customer', party, balance: Math.max(balance, 0) })
+                }
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead>Direction</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Note</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentPayments.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No payments recorded yet.
+                  </TableCell>
+                </TableRow>
+              )}
+              {recentPayments.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>{(p.payment_date || '').slice(0, 10)}</TableCell>
+                  <TableCell className="font-medium">
+                    {partyName.get(`${p.party_kind}:${p.party_id}`) || '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={p.direction === 'in' ? 'default' : 'secondary'}>
+                      {p.direction === 'in' ? 'Received' : 'Paid out'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{methodLabel(p.method)}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.note}</TableCell>
+                  <TableCell
+                    className={`text-right font-medium ${p.direction === 'in' ? 'text-green-600' : 'text-red-600'}`}
+                  >
+                    {fmtMoney(p.amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <RecordPaymentDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        preset={preset}
+        customers={customers}
+        suppliers={suppliers}
+      />
     </div>
   );
 };

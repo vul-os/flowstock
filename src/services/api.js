@@ -1,66 +1,104 @@
 /**
  * FlowStock data layer — one interface, two drivers.
  *
- * - Tauri driver: forwards every call to the Rust backend (SQLite + sync).
+ * - HTTP driver: talks to the Go backend (SQLite + peer sync) over the app's
+ *   own origin. This is the real app, whether self-hosted standalone or
+ *   embedded in the Vulos OS shell.
  * - Demo driver: runs entirely in the browser with seeded data, so
  *   `npm run dev` (and the screenshotter) work with zero setup.
+ *
+ * Selection: the demo driver is used when the UI is served by the Vite dev
+ * server (port 5173) or when VITE_DEMO=1; otherwise the HTTP driver talks to
+ * the Go backend that served the page.
  *
  * All row objects use snake_case column names, mirroring the SQLite schema.
  */
 
 import { seedDemoData } from './demo-data';
 
-const IS_TAURI = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
+const IS_DEMO =
+  import.meta.env.VITE_DEMO === '1' ||
+  (import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    window.location.port === '5173');
 
-// ── Tauri driver ─────────────────────────────────────────────────────────────
+// ── HTTP driver (Go backend) ──────────────────────────────────────────────────
 
-function makeTauriDriver() {
-  let invoke, listen;
-  const ready = Promise.all([
-    import('@tauri-apps/api/core').then((m) => (invoke = m.invoke)),
-    import('@tauri-apps/api/event').then((m) => (listen = m.listen)),
-  ]);
-
-  const call = async (cmd, args) => {
-    await ready;
-    return invoke(cmd, args);
+function makeHttpDriver() {
+  const req = async (method, path, body) => {
+    const res = await fetch(path, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const text = (await res.text()).trim();
+      throw new Error(text || `${method} ${path} failed (${res.status})`);
+    }
+    if (res.status === 204) return null;
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('application/json') ? res.json() : res.text();
   };
 
   return {
     isDemo: false,
-    bootstrap: () => call('bootstrap'),
+    bootstrap: () => req('GET', '/api/bootstrap'),
     setupWorkspace: (businessName, branchName) =>
-      call('setup_workspace', { businessName, branchName }),
-    updateSettings: (settings) => call('update_settings', { settings }),
-    listRows: (tbl) => call('list_rows', { tbl }),
-    putRow: (tbl, id, data) => call('put_row', { tbl, id: id || null, data }),
-    deleteRow: (tbl, id) => call('delete_row', { tbl, id }),
-    getStockLevels: () => call('get_stock_levels'),
+      req('POST', '/api/setup', { business_name: businessName, branch_name: branchName }),
+    updateSettings: (settings) => req('POST', '/api/settings', settings),
+    listRows: (tbl) => req('GET', `/api/rows/${tbl}`),
+    putRow: (tbl, id, data) => req('POST', `/api/rows/${tbl}`, { id: id || '', data }),
+    deleteRow: (tbl, id) => req('DELETE', `/api/rows/${tbl}/${id}`),
+    getStockLevels: () => req('GET', '/api/stock/levels'),
     adjustStock: ({ variantId, branchId, qtyDelta, kind, note }) =>
-      call('adjust_stock', { variantId, branchId, qtyDelta, kind, note: note || '' }),
+      req('POST', '/api/stock/adjust', {
+        variant_id: variantId,
+        branch_id: branchId,
+        qty_delta: qtyDelta,
+        kind,
+        note: note || '',
+      }),
     transferStock: ({ variantId, fromBranchId, toBranchId, qty, note }) =>
-      call('transfer_stock', { variantId, fromBranchId, toBranchId, qty, note: note || '' }),
-    saveOrder: (payload) => call('save_order', { payload }),
-    setOrderStatus: (orderId, status) => call('set_order_status', { orderId, status }),
-    savePurchaseOrder: (payload) => call('save_purchase_order', { payload }),
+      req('POST', '/api/stock/transfer', {
+        variant_id: variantId,
+        from_branch_id: fromBranchId,
+        to_branch_id: toBranchId,
+        qty,
+        note: note || '',
+      }),
+    saveOrder: (payload) => req('POST', '/api/orders/save', payload),
+    setOrderStatus: (orderId, status) =>
+      req('POST', '/api/orders/status', { order_id: orderId, status }),
+    savePurchaseOrder: (payload) => req('POST', '/api/purchase-orders/save', payload),
     setPurchaseOrderStatus: (poId, status) =>
-      call('set_purchase_order_status', { poId, status }),
+      req('POST', '/api/purchase-orders/status', { po_id: poId, status }),
     receivePurchaseOrder: (poId, receipts) =>
-      call('receive_purchase_order', { poId, receipts }),
-    getSyncSettings: () => call('get_sync_settings'),
+      req('POST', '/api/purchase-orders/receive', { po_id: poId, receipts }),
+    getSyncSettings: () => req('GET', '/api/sync/settings'),
     setSyncSettings: ({ listen: listenFlag, port, bindAddr, secret }) =>
-      call('set_sync_settings', { listen: listenFlag, port, bindAddr, secret }),
-    newSyncSecret: () => call('new_sync_secret'),
-    listPeers: () => call('list_peers'),
+      req('POST', '/api/sync/settings', {
+        listen: listenFlag,
+        port: String(port),
+        bind_addr: bindAddr,
+        secret,
+      }),
+    newSyncSecret: () => req('GET', '/api/sync/secret/new').then((r) => r.secret),
+    listPeers: () => req('GET', '/api/peers'),
     savePeer: ({ id, name, url, enabled }) =>
-      call('save_peer', { id: id || null, name, url, enabled }),
-    deletePeer: (id) => call('delete_peer', { id }),
-    syncNow: (peerId) => call('sync_now', { peerId: peerId || null }),
-    testPeer: (url) => call('test_peer', { url }),
+      req('POST', '/api/peers', { id: id || '', name, url, enabled }),
+    deletePeer: (id) => req('DELETE', `/api/peers/${id}`),
+    syncNow: (peerId) => req('POST', '/api/sync/now', { peer_id: peerId || '' }),
+    testPeer: (url) => req('POST', '/api/sync/test', { url }).then((r) => r.ok),
     onDataChanged: (cb) => {
-      let unlisten = () => {};
-      ready.then(() => listen('data-changed', cb).then((u) => (unlisten = u)));
-      return () => unlisten();
+      let es;
+      try {
+        es = new EventSource('/api/events');
+        es.addEventListener('data-changed', cb);
+      } catch {
+        return () => {};
+      }
+      return () => es && es.close();
     },
   };
 }
@@ -355,5 +393,5 @@ function makeDemoDriver() {
   };
 }
 
-export const api = IS_TAURI ? makeTauriDriver() : makeDemoDriver();
-export const isTauri = IS_TAURI;
+export const api = IS_DEMO ? makeDemoDriver() : makeHttpDriver();
+export const isDemo = IS_DEMO;

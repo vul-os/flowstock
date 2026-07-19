@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Users, Building2, Search } from 'lucide-react';
-import { supabase } from '@/services/supabaseClient';
+import { useState } from 'react';
+import { Plus, Search } from 'lucide-react';
+import { api } from '@/services/api';
+import { useTables } from '@/context/workspace-context';
+import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Input } from "@/components/ui/input";
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -10,55 +12,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { PartnersTable } from './table';
 import { PartnerDialog } from './dialog';
 import { StatsCards } from './stats';
 
-const PartnersPage = ({ organizationId }) => {
-  const [customers, setCustomers] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+const PartnersPage = () => {
+  const { data, loading } = useTables('customers', 'suppliers');
+  const customers = data.customers || [];
+  const suppliers = data.suppliers || [];
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [partnerType, setPartnerType] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const fetchPartners = async () => {
-    try {
-      setIsLoading(true);
-      const [customersResponse, suppliersResponse] = await Promise.all([
-        supabase
-          .from('customers')
-          .select('*')
-          .eq('organization_id', organizationId),
-        supabase
-          .from('suppliers')
-          .select('*')
-          .eq('organization_id', organizationId)
-      ]);
-
-      if (customersResponse.error) throw customersResponse.error;
-      if (suppliersResponse.error) throw suppliersResponse.error;
-
-      setCustomers(customersResponse.data || []);
-      setSuppliers(suppliersResponse.data || []);
-    } catch (error) {
-      console.error('Error fetching partners:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPartners();
-  }, [organizationId]);
 
   const handleCreatePartner = (type) => {
     setSelectedPartner(null);
@@ -74,45 +42,53 @@ const PartnersPage = ({ organizationId }) => {
 
   const handleSubmitPartner = async (partnerData, table) => {
     try {
-      if (selectedPartner) {
-        const { error } = await supabase
-          .from(table)
-          .update(partnerData)
-          .eq('id', selectedPartner.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from(table)
-          .insert([partnerData]);
-        if (error) throw error;
-      }
-      await fetchPartners();
+      await api.putRow(table, selectedPartner?.id || null, partnerData);
+      toast({
+        title: selectedPartner ? 'Partner updated' : 'Partner created',
+        description: `${partnerData.name} was saved.`,
+      });
     } catch (error) {
-      console.error('Error saving partner:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to save partner: ${error.message || error}`,
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDeletePartner = async (partner, type) => {
+    const table = type === 'customer' ? 'customers' : 'suppliers';
+    if (!window.confirm(`Delete ${partner.name}? This cannot be undone.`)) return;
+    try {
+      await api.deleteRow(table, partner.id);
+      toast({ title: 'Partner deleted', description: `${partner.name} was removed.` });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to delete partner: ${error.message || error}`,
+        variant: 'destructive',
+      });
+    }
+  };
 
-  const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const matches = (p) =>
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.company_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  const filteredCustomers = customers.filter(matches);
+  const filteredSuppliers = suppliers.filter(matches);
+
+  if (loading) {
+    return <div className="p-6 text-muted-foreground">Loading…</div>;
   }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Partners</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Partners</h1>
           <p className="text-muted-foreground mt-2">
             Manage your customers and suppliers
           </p>
@@ -139,11 +115,11 @@ const PartnersPage = ({ organizationId }) => {
             <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <Button onClick={() => handleCreatePartner('customer')} variant={partnerType === 'suppliers' ? 'outline' : 'default'}>
+            <Button onClick={() => handleCreatePartner('customer')}>
               <Plus className="h-4 w-4 mr-2" />
               Add Customer
             </Button>
-            <Button onClick={() => handleCreatePartner('supplier')} variant={partnerType === 'customers' ? 'outline' : 'default'}>
+            <Button onClick={() => handleCreatePartner('supplier')} variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Add Supplier
             </Button>
@@ -161,6 +137,7 @@ const PartnersPage = ({ organizationId }) => {
                 data={filteredCustomers}
                 type="customer"
                 onEdit={(partner) => handleEditPartner(partner, 'customer')}
+                onDelete={(partner) => handleDeletePartner(partner, 'customer')}
               />
             </CardContent>
           </Card>
@@ -177,6 +154,7 @@ const PartnersPage = ({ organizationId }) => {
                 data={filteredSuppliers}
                 type="supplier"
                 onEdit={(partner) => handleEditPartner(partner, 'supplier')}
+                onDelete={(partner) => handleDeletePartner(partner, 'supplier')}
               />
             </CardContent>
           </Card>
@@ -188,7 +166,6 @@ const PartnersPage = ({ organizationId }) => {
         onClose={() => setDialogOpen(false)}
         partner={selectedPartner}
         type={partnerType}
-        organizationId={organizationId}
         onSubmit={handleSubmitPartner}
       />
     </div>
