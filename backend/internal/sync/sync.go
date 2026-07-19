@@ -33,6 +33,9 @@ const Batch = 2000
 type Engine struct {
 	Store    *store.Store
 	SecretFn func() string
+	// FolderFn, if set, returns the shared-folder path for file-based transport
+	// (empty = disabled). Read on every round so toggling it takes effect live.
+	FolderFn func() string
 	NodeID   string
 	client   *http.Client
 	mu       sync.Mutex // serializes outbound rounds
@@ -317,6 +320,14 @@ func (e *Engine) SyncAll(ctx context.Context, only string) []Result {
 		}
 		e.Store.UpdatePeerStatus(p.ID, time.Now().UTC().Format(time.RFC3339), status)
 		results = append(results, res)
+	}
+	// Flush to / drain from the shared folder too, if one is configured. This
+	// runs even with no peers, so a folder-only (offline / sneakernet) topology
+	// works with no network sync at all.
+	if e.FolderFn != nil {
+		if dir := e.FolderFn(); dir != "" {
+			e.FolderSync(dir)
+		}
 	}
 	return results
 }

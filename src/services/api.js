@@ -83,13 +83,15 @@ function makeHttpDriver() {
     receivePurchaseOrder: (poId, receipts) =>
       req('POST', '/api/purchase-orders/receive', { po_id: poId, receipts }),
     getSyncSettings: () => req('GET', '/api/sync/settings'),
-    setSyncSettings: ({ listen: listenFlag, port, bindAddr, secret }) =>
+    setSyncSettings: ({ listen: listenFlag, port, bindAddr, secret, folder }) =>
       req('POST', '/api/sync/settings', {
         listen: listenFlag,
         port: String(port),
         bind_addr: bindAddr,
         secret,
+        ...(folder === undefined ? {} : { folder }),
       }),
+    folderSync: () => req('POST', '/api/sync/folder', {}),
     newSyncSecret: () => req('GET', '/api/sync/secret/new').then((r) => r.secret),
     listPeers: () => req('GET', '/api/peers'),
     savePeer: ({ id, name, url, enabled }) =>
@@ -370,6 +372,7 @@ function makeDemoDriver() {
       changed();
       return { ...d.sync, listening: d.sync.listen, node_id: 'DEMO-NODE' };
     },
+    folderSync: async () => ({ exported: 0, imported: 0, files: 0 }),
     newSyncSecret: async () =>
       [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''),
     listPeers: async () => live('peers').map((r) => ({ ...r })),

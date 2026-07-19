@@ -61,6 +61,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/peers", s.handleSavePeer)
 	mux.HandleFunc("DELETE /api/peers/{id}", s.handleDeletePeer)
 	mux.HandleFunc("POST /api/sync/now", s.handleSyncNow)
+	mux.HandleFunc("POST /api/sync/folder", s.handleSyncFolderNow)
 	mux.HandleFunc("POST /api/sync/test", s.handleTestPeer)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)

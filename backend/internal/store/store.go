@@ -407,6 +407,33 @@ func (s *Store) OpsAfter(remoteVector map[string]string, limit int) ([]Op, error
 	return out, rows.Err()
 }
 
+// OwnOpsAfter returns this node's own ops with an HLC strictly greater than
+// afterHLC, oldest first. It is the basis of the folder-sync exporter: a node
+// only ever exports the ops it authored, so its export file has a single writer
+// and file-sync tools (Dropbox/Syncthing/NAS) never see a conflict.
+func (s *Store) OwnOpsAfter(afterHLC string) ([]Op, error) {
+	rows, err := s.db.Query(
+		`SELECT hlc, node_id, org_id, tbl, row_id, deleted, payload FROM oplog
+		 WHERE node_id = ? AND hlc > ? ORDER BY hlc ASC`, s.nodeID, afterHLC)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Op
+	for rows.Next() {
+		var op Op
+		var del int
+		var payload string
+		if err := rows.Scan(&op.HLC, &op.NodeID, &op.OrgID, &op.Tbl, &op.RowID, &del, &payload); err != nil {
+			return nil, err
+		}
+		op.Deleted = del != 0
+		op.Payload = json.RawMessage(payload)
+		out = append(out, op)
+	}
+	return out, rows.Err()
+}
+
 // ── reads ─────────────────────────────────────────────────────────────────────
 
 // ListRows returns all live (or all, if includeDeleted) rows of a table as

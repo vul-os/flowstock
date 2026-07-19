@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"flowstock/backend/internal/store"
 )
@@ -21,15 +23,17 @@ func (s *Server) syncSettings() map[string]any {
 		"listening": listen,
 		"node_id":   s.Store.NodeID(),
 		"org_id":    s.Store.OrgID(),
+		"folder":    s.Store.GetSetting("sync_folder"),
 	}
 }
 
 func (s *Server) handleSetSyncSettings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Listen   bool   `json:"listen"`
-		Port     string `json:"port"`
-		BindAddr string `json:"bind_addr"`
-		Secret   string `json:"secret"`
+		Listen   bool    `json:"listen"`
+		Port     string  `json:"port"`
+		BindAddr string  `json:"bind_addr"`
+		Secret   string  `json:"secret"`
+		Folder   *string `json:"folder"`
 	}
 	if err := decode(r, &body); err != nil {
 		badRequest(w, err)
@@ -50,7 +54,28 @@ func (s *Server) handleSetSyncSettings(w http.ResponseWriter, r *http.Request) {
 		_ = s.Store.SetSetting("sync_bind_addr", body.BindAddr)
 	}
 	_ = s.Store.SetSetting("sync_secret", body.Secret)
+	// Optional shared-folder transport (Dropbox/Syncthing/NAS/USB). nil = leave
+	// unchanged; "" = disable.
+	if body.Folder != nil {
+		_ = s.Store.SetSetting("sync_folder", strings.TrimSpace(*body.Folder))
+	}
 	writeJSON(w, s.syncSettings())
+}
+
+// handleSyncFolderNow runs one folder export+import round immediately and
+// reports what moved. Requires a sync folder to be configured.
+func (s *Server) handleSyncFolderNow(w http.ResponseWriter, r *http.Request) {
+	dir := s.Store.GetSetting("sync_folder")
+	if dir == "" {
+		badRequest(w, fmt.Errorf("no sync folder configured"))
+		return
+	}
+	res := s.Sync.FolderSync(dir)
+	if res.Error != "" {
+		serverError(w, fmt.Errorf("%s", res.Error))
+		return
+	}
+	writeJSON(w, res)
 }
 
 func (s *Server) handleNewSecret(w http.ResponseWriter, r *http.Request) {

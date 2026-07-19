@@ -537,7 +537,14 @@ function PeerDialog({ open, onOpenChange, peer, onSaved }) {
 
 function SyncCard() {
   const { toast } = useToast();
-  const [form, setForm] = useState({ listen: false, port: '7365', bindAddr: '0.0.0.0', secret: '' });
+  const [form, setForm] = useState({
+    listen: false,
+    port: '7365',
+    bindAddr: '0.0.0.0',
+    secret: '',
+    folder: '',
+  });
+  const [folderSyncing, setFolderSyncing] = useState(false);
   const [status, setStatus] = useState(null); // {listening, bind_addr, port}
   const [loadingCfg, setLoadingCfg] = useState(true);
   const [savingCfg, setSavingCfg] = useState(false);
@@ -552,6 +559,7 @@ function SyncCard() {
       port: String(cfg.port ?? 7365),
       bindAddr: cfg.bind_addr || '0.0.0.0',
       secret: cfg.secret || '',
+      folder: cfg.folder || '',
     });
     setStatus({
       listening: !!cfg.listening,
@@ -632,6 +640,7 @@ function SyncCard() {
         port: Number(form.port) || 7365,
         bindAddr: form.bindAddr.trim() || '0.0.0.0',
         secret: form.secret.trim(),
+        folder: form.folder.trim(),
       });
       applyCfg(cfg);
       toast({ title: 'Sync settings saved' });
@@ -674,6 +683,23 @@ function SyncCard() {
     } finally {
       setSyncing(null);
       loadPeers();
+    }
+  };
+
+  const runFolderSync = async () => {
+    setFolderSyncing(true);
+    try {
+      const res = await api.folderSync();
+      toast({
+        title: 'Folder sync complete',
+        description: `Exported ${res.exported || 0}, imported ${res.imported || 0} change${
+          (res.exported || 0) + (res.imported || 0) === 1 ? '' : 's'
+        } across ${res.files || 0} peer file${res.files === 1 ? '' : 's'}.`,
+      });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Folder sync failed', description: errMsg(err) });
+    } finally {
+      setFolderSyncing(false);
     }
   };
 
@@ -795,6 +821,39 @@ function SyncCard() {
               <p className="text-xs text-gray-500">
                 Set the exact same secret on every branch device. Listening is refused
                 without a secret.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sync_folder">Sync folder (optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="sync_folder"
+                  value={form.folder}
+                  onChange={(e) => setForm((f) => ({ ...f, folder: e.target.value }))}
+                  placeholder="e.g. ~/Dropbox/flowstock  ·  /Volumes/USB/flowstock"
+                  className="font-mono"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={runFolderSync}
+                  disabled={folderSyncing || !form.folder.trim()}
+                  title="Export this device's changes and import every other device's"
+                >
+                  {folderSyncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Sync folder now
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                A shared folder (Dropbox, Google Drive, Syncthing, a NAS mount, or a USB
+                stick) is an alternative to networking: each device writes only its own
+                <span className="font-mono"> ops-&lt;id&gt;.jsonl</span> file, so file sync
+                never conflicts. Point every branch at the same folder — no ports, no
+                secret required for this path. Save first to enable it.
               </p>
             </div>
             <div className="flex justify-end">

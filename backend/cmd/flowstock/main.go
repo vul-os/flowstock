@@ -64,6 +64,7 @@ func main() {
 	defer st.Close()
 
 	syncEngine := syncpkg.New(st, func() string { return st.GetSetting("sync_secret") })
+	syncEngine.FolderFn = func() string { return st.GetSetting("sync_folder") }
 	apiServer := api.New(st, syncEngine, Version)
 	authHandler := auth.New(cfg.Password)
 
