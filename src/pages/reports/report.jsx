@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -40,7 +40,7 @@ import {
   movementLedger,
   MOVEMENT_KIND_LABELS,
 } from '@/lib/reports';
-import { REPORTS } from './index';
+import { REPORTS } from './reports-config';
 
 const GRID = '#e1e0d9';
 const AXIS_INK = '#898781';
@@ -267,7 +267,7 @@ function StockMovementsReport({ data, toast }) {
   const [kind, setKind] = useState('all');
   const [search, setSearch] = useState('');
 
-  const branches = data.branches || [];
+  const branches = useMemo(() => data.branches || [], [data.branches]);
 
   const ledger = useMemo(
     () =>

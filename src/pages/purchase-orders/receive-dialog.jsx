@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PackageCheck } from 'lucide-react';
 import { api } from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';

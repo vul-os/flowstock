@@ -1,4 +1,3 @@
-import React from 'react';
 import { HashRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes';
 import { Toaster } from '@/components/ui/toaster';

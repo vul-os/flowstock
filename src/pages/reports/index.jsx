@@ -1,52 +1,7 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Boxes,
-  ArrowLeftRight,
-  AlertTriangle,
-  TrendingUp,
-  Scale,
-  ArrowRightCircle,
-} from 'lucide-react';
-
-export const REPORTS = [
-  {
-    slug: 'inventory-valuation',
-    title: 'Inventory Valuation',
-    description: 'Stock on hand valued at cost and at retail, per variant with grand totals',
-    frequency: 'Monthly review',
-    icon: Boxes,
-  },
-  {
-    slug: 'stock-movements',
-    title: 'Stock Movements',
-    description: 'Full movement ledger — receipts, sales, transfers and adjustments, filterable',
-    frequency: 'Daily review',
-    icon: ArrowLeftRight,
-  },
-  {
-    slug: 'low-stock',
-    title: 'Low Stock',
-    description: 'Items at or below their reorder point, with shortfall and supplier hints',
-    frequency: 'Weekly review',
-    icon: AlertTriangle,
-  },
-  {
-    slug: 'sales',
-    title: 'Sales',
-    description: 'Monthly revenue for the trailing 12 months, top products and top customers',
-    frequency: 'Weekly review',
-    icon: TrendingUp,
-  },
-  {
-    slug: 'accounts',
-    title: 'Creditors & Debtors',
-    description: 'Outstanding balances — who owes you and who you owe, with totals',
-    frequency: 'Weekly review',
-    icon: Scale,
-  },
-];
+import { ArrowRightCircle } from 'lucide-react';
+import { REPORTS } from './reports-config';
 
 const ReportsPage = () => {
   const navigate = useNavigate();

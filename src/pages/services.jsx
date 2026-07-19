@@ -51,7 +51,7 @@ const emptyForm = { name: '', description: '', hourly_rate: '' };
 const ServicesPage = () => {
   const { data, loading } = useTables('services');
   const { fmtMoney } = useWorkspace();
-  const services = data.services || [];
+  const services = useMemo(() => data.services || [], [data.services]);
 
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);

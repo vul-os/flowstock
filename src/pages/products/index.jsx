@@ -156,7 +156,7 @@ const ProductManagement = () => {
     () => (data.branches || []).filter((b) => b.is_active !== 0 && b.is_active !== false),
     [data.branches],
   );
-  const variants = data.product_variants || [];
+  const variants = useMemo(() => data.product_variants || [], [data.product_variants]);
   const stockTotals = useMemo(() => totalsByVariant(levels), [levels]);
 
   const products = useMemo(() => {

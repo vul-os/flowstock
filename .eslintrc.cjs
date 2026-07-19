@@ -17,4 +17,14 @@ module.exports = {
     'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     'react/no-unescaped-entities': 'off',
   },
+  overrides: [
+    {
+      // shadcn/ui primitives and the app's context/theme providers idiomatically
+      // colocate a hook (useTheme, useWorkspace) or cva variants alongside their
+      // component. react-refresh/only-export-components is a dev-only Fast Refresh
+      // nicety that does not apply to these deliberate patterns.
+      files: ['src/components/ui/**', 'src/components/theme-provider.jsx', 'src/context/**'],
+      rules: { 'react-refresh/only-export-components': 'off' },
+    },
+  ],
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Moon, Sun, RefreshCw, Building2, FlaskConical } from 'lucide-react';
 import Logo from '@/assets/flowstock-logo.svg';

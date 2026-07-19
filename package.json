@@ -9,7 +9,7 @@
         "dev": "vite",
         "build": "vite build",
         "build:all": "vite build && cp -r dist backend/cmd/flowstock/dist && go build -tags embed_frontend -ldflags \"-X main.Version=$npm_package_version\" -o flowstock ./backend/cmd/flowstock && rm -rf backend/cmd/flowstock/dist",
-        "lint": "eslint . --ext js,jsx",
+        "lint": "eslint . --ext js,jsx --max-warnings 0",
         "preview": "vite preview",
         "dev:app": "go run ./backend/cmd/flowstock",
         "test:go": "go test ./backend/...",
