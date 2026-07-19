@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64" role="img" aria-label="FlowStock">
+  <defs>
+    <linearGradient id="fs-tile-w" x1="0" y1="0" x2="0.65" y2="1">
+      <stop offset="0" stop-color="#0F6D7A"/>
+      <stop offset="1" stop-color="#0A4B55"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#fs-tile-w)"/>
+  <rect x="12" y="13" width="25" height="9" rx="2.5" fill="#F4EDE0"/>
+  <rect x="20" y="27.5" width="25" height="9" rx="2.5" fill="#F2A413"/>
+  <rect x="28" y="42" width="25" height="9" rx="2.5" fill="#F4EDE0"/>
+  <text x="80" y="43" font-family="Archivo, 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif"
+        font-size="30" font-weight="700" letter-spacing="-0.5" fill="#0F6D7A">Flow<tspan fill="#2A241C">Stock</tspan></text>
+</svg>
