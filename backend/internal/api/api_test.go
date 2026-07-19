@@ -340,3 +340,13 @@ func TestEmptyCollectionsSerializeAsArrays(t *testing.T) {
 		}
 	}
 }
+
+// jsonf marshals a request body written as a Go map, which keeps the domain
+// tests readable.
+func jsonf(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
