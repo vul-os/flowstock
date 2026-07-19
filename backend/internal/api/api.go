@@ -21,6 +21,9 @@ type Server struct {
 	Store   *store.Store
 	Sync    *syncpkg.Engine
 	Version string
+	// SnapshotDir is where compaction writes snapshot.json. Empty disables
+	// writing a snapshot to disk (compaction then only prunes).
+	SnapshotDir string
 
 	subsMu sync.Mutex
 	subs   map[chan struct{}]bool
@@ -62,6 +65,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/peers/{id}", s.handleDeletePeer)
 	mux.HandleFunc("POST /api/sync/now", s.handleSyncNow)
 	mux.HandleFunc("POST /api/sync/folder", s.handleSyncFolderNow)
+	mux.HandleFunc("POST /api/sync/compact", s.handleCompact)
 	mux.HandleFunc("POST /api/sync/test", s.handleTestPeer)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)

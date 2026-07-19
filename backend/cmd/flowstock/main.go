@@ -66,6 +66,7 @@ func main() {
 	syncEngine := syncpkg.New(st, func() string { return st.GetSetting("sync_secret") })
 	syncEngine.FolderFn = func() string { return st.GetSetting("sync_folder") }
 	apiServer := api.New(st, syncEngine, Version)
+	apiServer.SnapshotDir = cfg.DataDir
 	authHandler := auth.New(cfg.Password)
 
 	mux := http.NewServeMux()

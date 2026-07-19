@@ -152,7 +152,9 @@ func initSchema(db *sql.DB) error {
 			url TEXT NOT NULL,
 			enabled INTEGER NOT NULL DEFAULT 1,
 			last_sync_at TEXT NOT NULL DEFAULT '',
-			last_status TEXT NOT NULL DEFAULT ''
+			last_status TEXT NOT NULL DEFAULT '',
+			vector TEXT NOT NULL DEFAULT '',
+			pubkey TEXT NOT NULL DEFAULT ''
 		);`)
 	return err
 }

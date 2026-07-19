@@ -703,6 +703,24 @@ function SyncCard() {
     }
   };
 
+  const [compacting, setCompacting] = useState(false);
+  const runCompact = async () => {
+    setCompacting(true);
+    try {
+      const res = await api.compact();
+      toast({
+        title: 'Compaction complete',
+        description: `Wrote a checksummed snapshot and pruned ${res.pruned || 0} op${
+          res.pruned === 1 ? '' : 's'
+        } every peer has acknowledged.`,
+      });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Compaction failed', description: errMsg(err) });
+    } finally {
+      setCompacting(false);
+    }
+  };
+
   const removePeer = async (peer) => {
     if (!window.confirm(`Remove peer "${peer.name}"?`)) return;
     try {
@@ -871,6 +889,18 @@ function SyncCard() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Peers</h3>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runCompact}
+                disabled={compacting}
+                title="Snapshot state and prune ops every peer has acknowledged"
+              >
+                {compacting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Compact
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

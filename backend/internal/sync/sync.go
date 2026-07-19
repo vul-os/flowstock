@@ -173,6 +173,10 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 		res.Error = fmt.Sprintf("peer is a different workspace (%s ≠ %s); refusing to sync", peerOrg, myOrg)
 		return res
 	}
+	// Record what this peer has acknowledged (a conservative lower bound: its
+	// vector before we push). It gates safe oplog pruning — an op is dropped
+	// only once every registered peer has it.
+	e.Store.SavePeerVector(peerID, peerVec)
 	window := peerVec
 	for {
 		ops, err := e.Store.OpsAfter(window, Batch)

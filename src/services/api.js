@@ -92,6 +92,7 @@ function makeHttpDriver() {
         ...(folder === undefined ? {} : { folder }),
       }),
     folderSync: () => req('POST', '/api/sync/folder', {}),
+    compact: () => req('POST', '/api/sync/compact', {}),
     newSyncSecret: () => req('GET', '/api/sync/secret/new').then((r) => r.secret),
     listPeers: () => req('GET', '/api/peers'),
     savePeer: ({ id, name, url, enabled }) =>
@@ -373,6 +374,7 @@ function makeDemoDriver() {
       return { ...d.sync, listening: d.sync.listen, node_id: 'DEMO-NODE' };
     },
     folderSync: async () => ({ exported: 0, imported: 0, files: 0 }),
+    compact: async () => ({ pruned: 0 }),
     newSyncSecret: async () =>
       [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''),
     listPeers: async () => live('peers').map((r) => ({ ...r })),

@@ -359,7 +359,10 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 
 // ── version vector + op selection ─────────────────────────────────────────────
 
-// Vector is this node's knowledge: newest hlc seen per origin node.
+// Vector is this node's knowledge: newest hlc seen per origin node. It merges
+// the live oplog with the snapshot floor (what a compaction already folded into
+// a snapshot and pruned), so pruning ops never makes the node forget what it
+// has already seen — the version vector can only move forward.
 func (s *Store) Vector() (map[string]string, error) {
 	rows, err := s.db.Query("SELECT node_id, MAX(hlc) FROM oplog GROUP BY node_id")
 	if err != nil {
@@ -374,7 +377,42 @@ func (s *Store) Vector() (map[string]string, error) {
 		}
 		out[node] = hlc
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	floor, _ := s.snapshotFloor()
+	for node, hlc := range floor {
+		if hlc > out[node] {
+			out[node] = hlc
+		}
+	}
+	return out, nil
+}
+
+// snapshotFloor is the version vector already captured by a snapshot and pruned
+// from the oplog. Persisted as JSON in settings.
+func (s *Store) snapshotFloor() (map[string]string, error) {
+	v := s.GetSetting("snapshot_floor")
+	out := map[string]string{}
+	if v == "" {
+		return out, nil
+	}
+	err := json.Unmarshal([]byte(v), &out)
+	return out, err
+}
+
+func (s *Store) mergeSnapshotFloor(add map[string]string) error {
+	cur, err := s.snapshotFloor()
+	if err != nil {
+		return err
+	}
+	for node, hlc := range add {
+		if hlc > cur[node] {
+			cur[node] = hlc
+		}
+	}
+	b, _ := json.Marshal(cur)
+	return s.SetSetting("snapshot_floor", string(b))
 }
 
 // OpsAfter returns ops the holder of remoteVector has not seen, oldest first,
@@ -607,6 +645,134 @@ func (s *Store) DeletePeer(id string) error {
 
 func (s *Store) UpdatePeerStatus(id, at, status string) {
 	_, _ = s.db.Exec("UPDATE peers SET last_sync_at = ?, last_status = ? WHERE id = ?", at, status, id)
+}
+
+// SavePeerVector records a peer's most recently observed version vector. It is
+// the input to conservative oplog pruning: an op may be dropped only once every
+// registered peer has acknowledged it.
+func (s *Store) SavePeerVector(id string, vec map[string]string) {
+	b, _ := json.Marshal(vec)
+	_, _ = s.db.Exec("UPDATE peers SET vector = ? WHERE id = ?", string(b), id)
+}
+
+// SavePeerPubkey records a peer's Ed25519 public key (hex), learned on pairing.
+func (s *Store) SavePeerPubkey(id, pubkeyHex string) {
+	_, _ = s.db.Exec("UPDATE peers SET pubkey = ? WHERE id = ?", pubkeyHex, id)
+}
+
+// EnabledPeerVectors returns the saved version vector of every enabled peer.
+// A peer with no recorded vector yet contributes an empty map, which blocks all
+// pruning (we cannot prove it has anything) — the safe default.
+func (s *Store) EnabledPeerVectors() ([]map[string]string, error) {
+	rows, err := s.db.Query("SELECT vector FROM peers WHERE enabled = 1")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]string
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		m := map[string]string{}
+		if v != "" {
+			_ = json.Unmarshal([]byte(v), &m)
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// PruneAckedOps removes oplog entries that every enabled peer has already
+// acknowledged, keeping at least the newest op per origin node so the version
+// vector never regresses. It is deliberately conservative: with no peers, or
+// any peer whose acknowledgement of an origin node is unknown, nothing for that
+// node is pruned. The pruned range is folded into the snapshot floor first, so
+// Vector() is unaffected.
+//
+// Tradeoff (documented): after pruning, a brand-new peer can no longer catch up
+// from the oplog alone for the pruned range; it must import a snapshot. Already
+// registered peers are unaffected because they have, by definition, acknowledged
+// everything pruned.
+func (s *Store) PruneAckedOps() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	peerVecs, err := s.EnabledPeerVectors()
+	if err != nil {
+		return 0, err
+	}
+	if len(peerVecs) == 0 {
+		return 0, nil // never prune without at least one acknowledging peer
+	}
+
+	// Per origin node, the floor = min acknowledged hlc across all peers.
+	origins := map[string]bool{}
+	rows, err := s.db.Query("SELECT DISTINCT node_id FROM oplog")
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		origins[n] = true
+	}
+	rows.Close()
+
+	floor := map[string]string{}
+	for origin := range origins {
+		min := ""
+		known := true
+		for i, pv := range peerVecs {
+			h := pv[origin]
+			if h == "" {
+				known = false // this peer hasn't acknowledged anything from origin
+				break
+			}
+			if i == 0 || h < min {
+				min = h
+			}
+		}
+		if known && min != "" {
+			floor[origin] = min
+		}
+	}
+	if len(floor) == 0 {
+		return 0, nil
+	}
+
+	// Record the floor before deleting, so the vector cannot regress even for a
+	// moment.
+	if err := s.mergeSnapshotFloor(floor); err != nil {
+		return 0, err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for origin, upto := range floor {
+		// Keep the single newest op per origin so Vector()'s oplog term is stable.
+		res, err := tx.Exec(
+			`DELETE FROM oplog WHERE node_id = ? AND hlc <= ?
+			 AND hlc <> (SELECT MAX(hlc) FROM oplog WHERE node_id = ?)`,
+			origin, upto, origin)
+		if err != nil {
+			tx.Rollback()
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		total += int(n)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────

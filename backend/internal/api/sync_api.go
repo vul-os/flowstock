@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"flowstock/backend/internal/store"
@@ -76,6 +77,32 @@ func (s *Server) handleSyncFolderNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, res)
+}
+
+// handleCompact writes a fresh checksummed snapshot and prunes oplog entries
+// that every enabled peer has acknowledged. Pruning is conservative and a no-op
+// without at least one acknowledging peer.
+func (s *Server) handleCompact(w http.ResponseWriter, r *http.Request) {
+	out := map[string]any{}
+	if s.SnapshotDir != "" {
+		snap, err := s.Store.WriteSnapshot(filepath.Join(s.SnapshotDir, "snapshot.json"))
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		out["snapshot"] = map[string]any{
+			"created_at": snap.CreatedAt,
+			"checksum":   snap.Checksum,
+			"path":       filepath.Join(s.SnapshotDir, "snapshot.json"),
+		}
+	}
+	pruned, err := s.Store.PruneAckedOps()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	out["pruned"] = pruned
+	writeJSON(w, out)
 }
 
 func (s *Server) handleNewSecret(w http.ResponseWriter, r *http.Request) {
