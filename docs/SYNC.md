@@ -58,18 +58,73 @@ needs to be reachable.
 
 ## Transport & security
 
-- The sync endpoints (`/api/sync/*`) live on the app's HTTP port and
-  authenticate every request with `Authorization: Bearer <shared secret>`.
-  **No secret → every sync request is rejected (401).** All branches of a
-  business share one secret.
+The sync endpoints (`/api/sync/*`) live on the app's HTTP port. Authentication
+is **mutual Ed25519 key auth** with the shared secret retained only for pairing.
+
+### How a request is authenticated
+
+Every sync request is **signed** with the caller's per-node identity key over a
+canonical envelope — `method`, `path`, `sha256(body)`, a Unix `timestamp` and a
+random `nonce`. The responder:
+
+1. checks the timestamp is **fresh** (within ±5 minutes) — rejects stale or
+   future-dated requests;
+2. looks up the **public key it recorded** for the caller's node id and verifies
+   the signature against *that* key (never the one the caller presents) — so a
+   caller cannot impersonate an enrolled node by presenting its own key;
+3. rejects a **replayed** `(node, nonce)` it has seen inside the freshness
+   window.
+
+### The shared secret: pairing bootstrap, not the gate
+
+The shared secret now has exactly two jobs:
+
+- **Pairing bootstrap.** A node that has not yet enrolled a key proves it knows
+  the secret; that authorizes the responder to record (trust-on-first-use) the
+  key it presents. From then on the node authenticates **by key** and the secret
+  is no longer consulted for it. This is how a new branch *earns* enrollment.
+- **Compatibility fallback** (opt-in). With `sync_secret_fallback` enabled
+  (default **off**), an already-enrolled peer may still authenticate with the
+  secret alone. With the default off, an enrolled peer that presents no valid
+  signature is **rejected — the mesh fails closed.**
+
+With no secret set *and* no enrolled key, every request is rejected (401).
+
+### Threat model
+
+| Threat | What stops it |
+|---|---|
+| A stranger on the network reaching the sync API | They have neither the shared secret (to bootstrap) nor an enrolled key → rejected. |
+| A former branch whose key you removed | Its key no longer verifies. It can only re-enroll if it still knows the shared secret — so full revocation = **remove the peer row *and* rotate the secret**. |
+| Someone who learns the shared secret | They can bootstrap-enroll a *new* key, but cannot forge requests as an *existing* enrolled node (those verify against the recorded key). Rotate the secret to stop new enrollments. |
+| A captured request replayed later | Fails the freshness window and/or the replay-nonce cache. |
+| A tampered request body / retargeted path | The body hash and path are inside the signed envelope → signature fails. |
+| Two unrelated businesses sharing a secret by accident | `org_id` isolation rejects foreign ops regardless of transport auth (see Workspaces above). |
+
+**What the shared secret still protects:** the *bootstrap* step — only someone
+with the secret can get a key enrolled. **What key auth adds on top:** per-node
+identity, non-repudiation, replay protection, and revocation that does not
+require re-keying everyone (remove one peer row).
+
+### Revocation
+
+Deleting a peer row removes its recorded key, so that node can no longer
+authenticate by key. A node that paired *inbound* (dialed you) appears in
+**Settings → Sync → Peers** badged **inbound** with no dial URL; removing it
+revokes it. Because a node that still knows the shared secret could re-bootstrap
+a fresh key, rotate the secret alongside removal to revoke completely.
+
+### Network
+
 - To be reachable by other branches, run with `host: 0.0.0.0`. Peers connect to
-  `http://<host>:<port>` (the app's own address).
-- Sync traffic is business data — run it on a **trusted network**: a LAN, a
+  `http://<host>:<port>` — the app's own address (sync shares the app port;
+  there is no separate sync port).
+- Sync traffic is business data. The signatures authenticate peers but do **not**
+  encrypt the payload, so still run it on a **trusted network**: a LAN, a
   VPN/overlay (Tailscale, WireGuard, Netbird), or an HTTPS tunnel such as a
   [Vulos Relay](https://github.com/vul-os/vulos-relay) exposing the port as
   `https://…`. Peer URLs may be `http://` or `https://`.
-- The secret is compared in constant time; failed auth returns 401 with no
-  detail.
+- The shared secret is compared in constant time; failed auth returns 401.
 
 ### Independence first
 
@@ -144,15 +199,17 @@ the lines already written, so folder late-joiners still replay in full.)
 
 ## Per-node identity
 
-Each node generates an **Ed25519 keypair** on first run. It signs the op
-batches it pushes and the snapshots it writes, so replicated data is
-attributable and **tamper-evident** — a receiver verifies a signed batch and
-rejects it if the signature does not match. Public keys are exchanged in the
-sync handshake and recorded against each peer (`peers.pubkey`) on pairing.
+Each node generates an **Ed25519 keypair** on first run. That one identity does
+double duty:
 
-This is groundwork. Transport auth is **still the shared Bearer secret** exactly
-as described above; upgrading the transport to mutual key authentication (keys
-instead of a shared secret) is the intended next step and is not forced today.
+- it signs the **op batches** a node pushes and the **snapshots** it writes, so
+  replicated data is attributable and **tamper-evident**; and
+- it signs every **sync request** (see *Transport & security* above), which is
+  how the mutual key authentication works.
+
+Public keys are exchanged in the sync handshake and recorded against each peer
+(`peers.pubkey`, keyed to the remote `node_id`) on pairing — the same recorded
+key that inbound requests are then verified against.
 
 ## Conflict examples
 

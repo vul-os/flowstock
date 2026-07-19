@@ -15,7 +15,7 @@ iframe.
 │  Go HTTP server (net/http)                                                           │
 │   ├─ api/     application API: CRUD, stock ops, order/PO workflows, sync settings    │
 │   ├─ auth/    optional single-password owner session                                │
-│   ├─ sync/    leaderless peer replication + /api/sync/* (bearer-secret)             │
+│   ├─ sync/    leaderless peer replication + /api/sync/* (mutual key auth)           │
 │   ├─ store/   HLC clock · oplog · LWW/union merge · version vector                   │
 │   └─ SQLite (WAL)  ~/.flowstock/flowstock.db                                         │
 │                                                                                     │
@@ -90,8 +90,10 @@ Applying a remote op:
 ## Sync protocol
 
 Three endpoints, served on the same HTTP listener as the app, all requiring
-`Authorization: Bearer <shared secret>`; with no secret configured they reject
-every request (fail closed):
+**mutual Ed25519 key authentication** — each request is signed with the caller's
+node key and verified against the key enrolled for that node (the shared secret
+only bootstraps pairing; see [SYNC.md](SYNC.md)). With no enrolled key and no
+secret they reject every request (fail closed):
 
 | Endpoint | Purpose |
 |---|---|
@@ -107,9 +109,11 @@ through head office, or chains — because ops carry their origin node and relay
 transitively.
 
 Op batches are **signed** with the sender's Ed25519 key and verified on receipt
-(tamper-evidence); the transport still authenticates with the shared Bearer
-secret. See [SYNC.md](SYNC.md) for identity and the roadmap to key-based
-transport auth.
+(tamper-evidence), and the **transport itself** is mutually key-authenticated:
+every request is signed over a canonical envelope (method, path, body hash,
+timestamp, nonce), verified against the peer's enrolled key with ±5-min
+freshness and replay protection. See [SYNC.md](SYNC.md) for the full identity,
+threat model and revocation story.
 
 ## Folder transport, snapshots & compaction
 

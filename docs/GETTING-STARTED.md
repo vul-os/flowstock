@@ -66,9 +66,13 @@ Each branch is its own FlowStock install with its own database. To link them:
    (or `"host": "0.0.0.0"` in the config) so it accepts connections from other
    machines.
 2. On **Settings → Sync**, set the **same shared secret** on every branch
-   (use *Generate* on one, copy it to the others).
+   (use *Generate* on one, copy it to the others). The secret pairs the branches
+   the first time they sync; from then on they authenticate each other by
+   Ed25519 key, so the secret is a one-time bootstrap rather than a standing
+   password.
 3. On one branch, add the others as **peers** — name + URL, e.g.
-   `http://192.168.1.20:8787` — and press *Test connection*, then *Sync now*.
+   `http://192.168.1.20:8787` (the same address the branch serves FlowStock on;
+   sync shares the app port) — and press *Test connection*, then *Sync now*.
 
 Branches sync automatically once a minute when reachable. A branch that goes
 offline keeps trading normally and converges the next time it can reach any

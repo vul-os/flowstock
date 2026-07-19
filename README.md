@@ -69,8 +69,11 @@ branches need to sync across the internet without opening ports.
   only its own append-only file, so file-sync never conflicts
 - 🗜️ **Bounded history** — one-click compaction writes a checksummed, signed
   snapshot and prunes ops every branch has acknowledged
-- 🔑 **Signed replication** — each node has an Ed25519 identity; op batches and
-  snapshots are signed and tamper-checked (shared-secret transport unchanged)
+- 🔑 **Mutual key-authenticated sync** — each node has an Ed25519 identity; op
+  batches and snapshots are signed, and every sync request is signed and
+  verified against the peer's enrolled key (±5-min freshness, replay-protected).
+  The shared secret only bootstraps pairing; revoke a node by removing its peer
+  row
 - 🧾 **Sales orders** — draft → confirm (deducts stock) → paid; cancelling
   reverses stock; product + service line items
 - 🚚 **Purchasing** — purchase orders with VAT, goods receiving with partial
@@ -139,8 +142,9 @@ npm install && npm run dev    # → http://localhost:5173
 ```
 
 **Connect a second branch:** run each with `FLOWSTOCK_HOST=0.0.0.0`, set the
-same sync secret on both (Settings → Sync), add the other's URL
-(`http://<host>:8787`) as a peer, *Sync now*. Details in
+same sync secret on both (Settings → Sync) to pair them — after pairing they
+authenticate each other by key — add the other's URL (`http://<host>:8787`) as a
+peer, *Sync now*. Details in
 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ## How it works
@@ -155,7 +159,7 @@ flowchart LR
         UB[Browser UI] --> CB[Go binary]
         CB --> DB[(SQLite + oplog)]
     end
-    CA <-- "HTTP /api/sync (Bearer secret)<br>LAN · VPN · Vulos Relay" --> CB
+    CA <-- "HTTP /api/sync (mutual Ed25519 key auth)<br>LAN · VPN · Vulos Relay" --> CB
 ```
 
 Every mutation is journalled to an oplog with a hybrid-logical-clock timestamp

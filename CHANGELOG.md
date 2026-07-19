@@ -28,12 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regresses). Snapshots rebuild a late joiner from state.
 - **Per-node Ed25519 identity**: generated on first run; op batches and
   snapshots are signed and tamper-checked, and peer public keys are recorded on
-  pairing. Shared-secret transport auth is unchanged (key-based transport is a
-  documented next step).
+  pairing.
+- **Mutual Ed25519 transport auth for the sync mesh**: every sync request is
+  signed with the node's identity key over a canonical envelope (method, path,
+  body hash, timestamp, nonce). The responder verifies the signature against the
+  key it recorded for that node, enforces a ±5-minute freshness window and
+  rejects replayed nonces. The shared secret is retained only as (a) the pairing
+  bootstrap that authorizes trust-on-first-use enrollment of a node's key, and
+  (b) an opt-in compatibility fallback (`sync_secret_fallback`, default off).
+  Once a peer has enrolled a key, key auth is required and the mesh **fails
+  closed**. Removing a peer row revokes its key; an inbound-only peer that paired
+  with you appears in the peer list (badged *inbound*) so you can revoke it.
 
 ### Changed
-- Synced-table envelope gains `org_id`; `peers` gains `vector` + `pubkey`.
+- Synced-table envelope gains `org_id`; `peers` gains `vector`, `pubkey` and
+  `node_id` (idempotent additive migrations for existing databases).
+- Sync transport auth upgraded from a single shared Bearer secret to mutual key
+  authentication (the secret now bootstraps pairing rather than gating every
+  request). The Settings → Sync screen drops the misleading editable sync
+  port/bind fields — sync shares the app's own HTTP port.
 - `received_quantity` is derived (never stored) and folded out of the schema.
+
+### Fixed
+- Joining a workspace now records the joined peer's identity and acknowledged
+  vector on the real peer row (previously written to a throwaway id and lost).
 
 ## [1.0.0] - 2026-07-19
 

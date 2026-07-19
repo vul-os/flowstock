@@ -25,6 +25,7 @@ resolve in the order **config file → environment variable → default**.
 | `data_dir` | `FLOWSTOCK_DATA_DIR` | `~/.flowstock` | holds `flowstock.db` (and `snapshot.json` after a Compact) |
 | `password` | `FLOWSTOCK_PASSWORD` | *(empty)* | if set, gates the app + data API behind an owner password |
 | `frame_ancestors` | `FLOWSTOCK_FRAME_ANCESTORS` | *(empty)* | origins allowed to iframe FlowStock, e.g. `https://vulos.org` (for the Vulos OS shell) |
+| `sync_secret_fallback` | `FLOWSTOCK_SYNC_SECRET_FALLBACK` | `false` | when `true`, lets an already-enrolled sync peer authenticate with the shared secret alone instead of a request signature — a compatibility escape hatch for mixed-version fleets. Default `false` = mutual key auth is required once a peer has enrolled a key (the mesh fails closed) |
 
 The `--port` flag overrides the port; `--version` prints the version.
 
@@ -55,12 +56,20 @@ generated on first run). Neither is edited by hand. See [SYNC.md](SYNC.md).
 
 ## Security notes
 
-- The sync mesh authenticates with a bearer secret and **fails closed**: with
-  no secret set, `/api/sync/*` returns 401. All branches share one secret.
-- Beyond the secret, ops carry an `org_id` (a foreign workspace's ops are
-  dropped even if the secret matched) and are **signed** with the node's
-  Ed25519 key and verified on receipt (tamper-evident).
-- Sync is plain HTTP over whatever network you run it on. Use a trusted LAN, a
+- The sync mesh uses **mutual Ed25519 key authentication** and **fails closed**:
+  each request is signed by the caller's node key and verified against the key
+  recorded for that node, with ±5-minute freshness and replay protection. The
+  shared secret only **bootstraps pairing** (it authorizes enrolling a new
+  node's key) and, if `sync_secret_fallback` is on, is an opt-in compatibility
+  path. With no secret and no enrolled key, `/api/sync/*` returns 401. Full
+  detail and threat model: [SYNC.md](SYNC.md).
+- **Revocation:** remove a peer row to drop its key; rotate the shared secret to
+  stop a removed node from re-bootstrapping a new key.
+- Beyond auth, ops carry an `org_id` (a foreign workspace's ops are dropped even
+  if the transport authenticated) and are **signed** with the node's Ed25519 key
+  and verified on receipt (tamper-evident).
+- Sync signatures authenticate peers but do not encrypt the payload. Sync is
+  plain HTTP over whatever network you run it on. Use a trusted LAN, a
   VPN/overlay (Tailscale, WireGuard, Netbird), or an HTTPS tunnel
   (Vulos Relay, an *optional* convenience — never required). Peer URLs may be
   `http://` or `https://`.
