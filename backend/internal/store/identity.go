@@ -96,3 +96,13 @@ func (s *Store) CryptoSigner() (crypto.Signer, bool) {
 	}
 	return s.priv, true
 }
+
+// PrivateSeedHexForTest exposes the private seed so tests can assert it never
+// escapes through an API surface. It exists only to make a negative assertion
+// checkable; nothing in the product calls it, and it must stay that way.
+func (s *Store) PrivateSeedHexForTest() string {
+	if s.priv == nil {
+		return ""
+	}
+	return hex.EncodeToString(s.priv.Seed())
+}

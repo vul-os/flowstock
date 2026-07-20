@@ -99,12 +99,39 @@ func Open(path string) (*Store, error) {
 	}
 
 	s := &Store{db: db}
+
+	// Per-node Ed25519 identity (generated once), used to sign op batches and
+	// snapshots. Transport auth is unchanged (shared Bearer secret).
+	if err := s.ensureIdentity(); err != nil {
+		return nil, fmt.Errorf("node identity: %w", err)
+	}
+
+	// Identity first: on a brand-new database the node id is derived from the
+	// public key, so ensureIdentity has to run before node_id is settled.
+
 	node, err := s.getSetting("node_id")
 	if err != nil {
 		return nil, err
 	}
 	if node == "" {
-		node = NewID()
+		// A fresh node's id IS its public key.
+		//
+		// FlowStock breaks an exact HLC tie on node id; the DMTAP substrate
+		// engine breaks the same tie on the author's public key. Both converge,
+		// but given identical history they can pick different winners — which is
+		// why adopting the substrate has to be a deployment-wide switch rather
+		// than a gradual rollout. Making the two values the same removes the
+		// divergence at its source, so a future cutover is a change of engine
+		// rather than a change of outcome.
+		//
+		// Only new databases. An existing node's peers enrolled its ULID at
+		// pairing and every oplog row is keyed by it, so rewriting it would
+		// invalidate the mesh and the history at once. Those nodes keep their
+		// ULID and simply keep the tie-break they already had.
+		node = s.PublicKeyHex()
+		if node == "" {
+			node = NewID() // identity unavailable: fall back rather than fail to open
+		}
 		if err := s.SetSetting("node_id", node); err != nil {
 			return nil, err
 		}
@@ -125,12 +152,6 @@ func Open(path string) (*Store, error) {
 		}
 	}
 	s.orgID = org
-
-	// Per-node Ed25519 identity (generated once), used to sign op batches and
-	// snapshots. Transport auth is unchanged (shared Bearer secret).
-	if err := s.ensureIdentity(); err != nil {
-		return nil, fmt.Errorf("node identity: %w", err)
-	}
 
 	// Seed the clock past everything already journalled.
 	var maxHLC sql.NullString

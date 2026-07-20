@@ -206,20 +206,33 @@ func TestPeerURLValidation(t *testing.T) {
 	}
 }
 
-// Peer listings drive an operator UI. They report whether a key is enrolled but
-// must never hand back the key material or the shared secret.
-func TestPeerListingDoesNotLeakKeyMaterial(t *testing.T) {
+// Peer listings drive an operator UI. They report whether a key is enrolled and
+// must never hand back the shared secret.
+//
+// This test used to also forbid the peer's public key appearing in the listing.
+// That guard was written when a node's id and its public key were different
+// values, and withholding the key was free. A fresh node's id IS its public key
+// now (so that FlowStock and the substrate engine break an exact HLC tie on the
+// same value), which makes the old assertion unsatisfiable without also
+// withholding the node id — a field the operator UI exists to show, and which
+// already travels in every oplog row exchanged with every peer.
+//
+// This is a change of premise, not a relaxed check. An Ed25519 public key is
+// designed to be published; it is the verification half of the pair. The secret
+// half — the seed, and the shared pairing secret — is what must never appear,
+// and both are still asserted below.
+func TestPeerListingDoesNotLeakSecrets(t *testing.T) {
 	h := newHarness(t)
 	rem := newRemote(t, "shared-secret")
 	h.mustJSON(h.do("POST", "/api/workspace/join", joinBody(rem.srv.URL, "shared-secret")), &map[string]any{})
 
 	w := h.do("GET", "/api/peers", "")
 	body := w.Body.String()
-	if strings.Contains(body, rem.st.PublicKeyHex()) {
-		t.Fatal("the peers listing must not include raw public key material")
-	}
 	if strings.Contains(body, "shared-secret") {
 		t.Fatal("the peers listing must not include the shared secret")
+	}
+	if seed := h.st.PrivateSeedHexForTest(); seed != "" && strings.Contains(body, seed) {
+		t.Fatal("the peers listing must never include private key material")
 	}
 	var peers []store.Peer
 	if err := json.Unmarshal(w.Body.Bytes(), &peers); err != nil {
