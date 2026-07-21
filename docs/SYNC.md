@@ -215,9 +215,15 @@ key that inbound requests are then verified against.
 
 FlowStock's merge rules — last-writer-wins for catalog rows, union for the
 ledgers — were written for FlowStock. The Vulos suite now has one specified
-implementation of those rules that several products share, and FlowStock can use
-it instead: set `substrate_sync` (see [Configuration](CONFIGURATION.md)). It is
-off by default and the built-in engine is untouched.
+implementation of those rules that several products share, and FlowStock uses it:
+the shared engine is the merge authority by default. The built-in CRDT is still
+carried, still tested, and still reachable with `substrate_sync: false` (see
+[Configuration](CONFIGURATION.md)).
+
+Because the two engines break ties differently, a node **advertises which engine
+it merges by** in the sync handshake, and refuses a round with a peer that
+disagrees. Two algebras in one mesh converge only by luck, and the failure would
+otherwise be invisible.
 
 Nothing about the deployment changes. Storage is still SQLite, transport is
 still the mutual-Ed25519 HTTP pull and the folder-sync path, and the per-node

@@ -65,9 +65,10 @@ func main() {
 	}
 	defer st.Close()
 
-	// The shared DMTAP sync engine, off unless asked for. When on it becomes the
-	// merge authority: FlowStock still owns storage, transport and identity, and
-	// the substrate's six-kind algebra decides which write wins.
+	// The shared DMTAP sync engine, on unless an operator pins this node to the
+	// built-in CRDT. It is the merge authority: FlowStock still owns storage,
+	// transport and identity, and the substrate's six-kind algebra decides which
+	// write wins.
 	//
 	// Compiling the engine is the expensive step (~200-400ms) and is paid once
 	// here, then amortized over the process lifetime — which is why a daemon
@@ -82,7 +83,7 @@ func main() {
 	defer cancel()
 
 	var substrateEngine *substrate.Engine
-	if cfg.SubstrateSync {
+	if cfg.UseSubstrate() {
 		started := time.Now()
 		substrateEngine, err = substrate.OpenForStore(ctx, st, filepath.Join(cfg.DataDir, "wasm-cache"))
 		if err != nil {
@@ -97,6 +98,13 @@ func main() {
 	syncEngine := syncpkg.New(st, func() string { return st.GetSetting("sync_secret") })
 	syncEngine.FolderFn = func() string { return st.GetSetting("sync_folder") }
 	syncEngine.AllowSecretFallback = cfg.SyncSecretFallback
+	// Advertise the algebra this node merges by, so a peer running the other one
+	// is refused rather than silently diverged from.
+	if cfg.UseSubstrate() {
+		syncEngine.MergeEngine = syncpkg.MergeSubstrate
+	} else {
+		syncEngine.MergeEngine = syncpkg.MergeBuiltin
+	}
 	apiServer := api.New(st, syncEngine, Version)
 	apiServer.SnapshotDir = cfg.DataDir
 	apiServer.Substrate = substrateEngine

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,5 +200,87 @@ func TestTwoBranchesSyncOverHTTPAndSurviveOffline(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("no-secret listener should 401 an unsigned request, got %d", resp.StatusCode)
+	}
+}
+
+// A mesh must not run two merge algebras at once. The two engines are each
+// convergent but break HLC ties differently (node id vs author public key), so
+// a mixed round is accepted by both sides and then quietly disagrees about which
+// concurrent write won. SyncPeer therefore refuses the round outright.
+func TestMergeEngineMismatchRefusesSync(t *testing.T) {
+	ctx := context.Background()
+
+	a := newNode(t, "A", "shared-secret")
+	b := newNode(t, "B", "shared-secret")
+
+	// Matching engines (both default to built-in) sync normally.
+	put(t, a.st, "products", "p1", map[string]any{"name": "Anvil"})
+	if res := b.eng.SyncPeer(ctx, "peerA", a.server.URL); !res.OK {
+		t.Fatalf("matching engines should sync: %s", res.Error)
+	}
+
+	// Flip A onto the substrate and the round is refused from either direction.
+	a.eng.MergeEngine = MergeSubstrate
+	put(t, a.st, "products", "p2", map[string]any{"name": "Vise"})
+
+	res := b.eng.SyncPeer(ctx, "peerA", a.server.URL)
+	if res.OK {
+		t.Fatal("built-in node must refuse a substrate peer")
+	}
+	if !strings.Contains(res.Error, MergeSubstrate) || !strings.Contains(res.Error, MergeBuiltin) {
+		t.Fatalf("error should name both engines, got %q", res.Error)
+	}
+	// Nothing crossed the wire.
+	rows, _ := b.st.ListRows("products", false)
+	for _, r := range rows {
+		if r["name"] == "Vise" {
+			t.Fatal("ops leaked across a merge-engine mismatch")
+		}
+	}
+
+	res = a.eng.SyncPeer(ctx, "peerB", b.server.URL)
+	if res.OK {
+		t.Fatal("substrate node must refuse a built-in peer")
+	}
+
+	// Agreeing again restores sync, which is what finishing a rollout looks like.
+	b.eng.MergeEngine = MergeSubstrate
+	if res := b.eng.SyncPeer(ctx, "peerA", a.server.URL); !res.OK {
+		t.Fatalf("re-agreed engines should sync: %s", res.Error)
+	}
+}
+
+// A node built before the handshake carried merge_engine omits the field. That
+// is always the built-in engine, so it must be readable as such rather than as
+// an unknown that blocks every peer.
+func TestLegacyPeerWithoutEngineFieldIsBuiltin(t *testing.T) {
+	ctx := context.Background()
+	local := newNode(t, "L", "shared-secret")
+
+	// Stand in for an older build: a vector response with no merge_engine.
+	legacy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"node_id": "legacy-node",
+			"org_id":  local.st.OrgID(),
+			"vector":  map[string]string{},
+		})
+	}))
+	t.Cleanup(legacy.Close)
+
+	// The local node is on the built-in engine, so the legacy peer is compatible
+	// and the round gets past the guard.
+	if res := local.eng.SyncPeer(ctx, "legacy", legacy.URL); !res.OK {
+		t.Fatalf("legacy peer should read as built-in: %s", res.Error)
+	}
+
+	// On the substrate it is a mismatch, and the message says so in terms of the
+	// engine rather than of a missing field.
+	local.eng.MergeEngine = MergeSubstrate
+	res := local.eng.SyncPeer(ctx, "legacy", legacy.URL)
+	if res.OK {
+		t.Fatal("substrate node must refuse a legacy built-in peer")
+	}
+	if !strings.Contains(res.Error, MergeBuiltin) {
+		t.Fatalf("error should name the built-in engine, got %q", res.Error)
 	}
 }

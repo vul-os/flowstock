@@ -30,6 +30,31 @@ import (
 // Batch bounds how many ops travel per request.
 const Batch = 2000
 
+// Merge-engine identifiers exchanged in the /api/sync/vector handshake.
+//
+// The two engines are each convergent but do not share a total order —
+// FlowStock's built-in CRDT breaks an HLC tie on node id, the DMTAP substrate
+// on the author's public key — so a mesh running both can pick different
+// winners for the same pair of concurrent writes. That divergence is silent:
+// every node reports a healthy sync and simply disagrees about a row.
+//
+// So the engine is part of the handshake and a mismatch refuses the round.
+// A node running a build from before this field existed omits it, which is
+// exactly the built-in engine, so the empty string normalizes to MergeBuiltin.
+const (
+	MergeBuiltin   = "builtin"
+	MergeSubstrate = "substrate"
+)
+
+// normalizeEngine maps the wire value onto a known engine. An absent field is
+// an older build, which is always the built-in engine.
+func normalizeEngine(v string) string {
+	if v == "" {
+		return MergeBuiltin
+	}
+	return v
+}
+
 // Engine wires the store to the network. SecretFn is read on every request so
 // rotating the secret in settings takes effect immediately.
 type Engine struct {
@@ -42,7 +67,12 @@ type Engine struct {
 	// shared secret alone (compatibility). Default false = key auth required once
 	// a peer has enrolled a key (fail closed).
 	AllowSecretFallback bool
-	NodeID              string
+	// MergeEngine names the algebra this node merges by (MergeBuiltin or
+	// MergeSubstrate). It is advertised in the handshake and must match the
+	// peer's, because two engines that disagree about tie-breaks converge only
+	// by luck. Empty is treated as MergeBuiltin.
+	MergeEngine string
+	NodeID      string
 	client              *http.Client
 	nonces              *nonceCache
 	mu                  sync.Mutex // serializes outbound rounds
@@ -50,11 +80,12 @@ type Engine struct {
 
 func New(s *store.Store, secretFn func() string) *Engine {
 	return &Engine{
-		Store:    s,
-		SecretFn: secretFn,
-		NodeID:   s.NodeID(),
-		client:   &http.Client{Timeout: 20 * time.Second},
-		nonces:   newNonceCache(),
+		Store:       s,
+		SecretFn:    secretFn,
+		NodeID:      s.NodeID(),
+		MergeEngine: MergeBuiltin,
+		client:      &http.Client{Timeout: 20 * time.Second},
+		nonces:      newNonceCache(),
 	}
 }
 
@@ -94,7 +125,13 @@ func (e *Engine) handleVector(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]any{"node_id": e.NodeID, "org_id": e.Store.OrgID(), "pubkey": e.Store.PublicKeyHex(), "vector": vec})
+	writeJSON(w, map[string]any{
+		"node_id":      e.NodeID,
+		"org_id":       e.Store.OrgID(),
+		"pubkey":       e.Store.PublicKeyHex(),
+		"merge_engine": normalizeEngine(e.MergeEngine),
+		"vector":       vec,
+	})
 }
 
 func (e *Engine) handleOps(w http.ResponseWriter, r *http.Request) {
@@ -161,11 +198,12 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	// 1. Learn the peer's vector (and workspace id), then push everything it
 	// lacks. The window vector advances past each pushed batch so batches never
 	// overlap.
-	peerVec, peerNode, peerOrg, peerPub, err := e.fetchVector(ctx, base, auth)
+	peer, err := e.fetchVector(ctx, base, auth)
 	if err != nil {
 		res.Error = err.Error()
 		return res
 	}
+	peerVec, peerNode, peerOrg, peerPub := peer.Vector, peer.NodeID, peer.OrgID, peer.PubKey
 	if peerPub != "" {
 		// Learn/confirm the peer's identity so inbound requests from that same
 		// node can later be authenticated by key.
@@ -182,6 +220,18 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	}
 	if myOrg := e.Store.OrgID(); peerOrg != "" && myOrg != "" && peerOrg != myOrg {
 		res.Error = fmt.Sprintf("peer is a different workspace (%s ≠ %s); refusing to sync", peerOrg, myOrg)
+		return res
+	}
+	// Both sides must merge by the same algebra. Exchanging ops across a
+	// mismatch does not fail loudly on its own — both nodes would accept every
+	// op and quietly disagree about which concurrent write won — so the round is
+	// refused here instead. During a rolling upgrade this is the expected state
+	// until every node is switched; it clears itself with no operator action
+	// beyond finishing the rollout.
+	if mine := normalizeEngine(e.MergeEngine); peer.MergeEngine != mine {
+		res.Error = fmt.Sprintf(
+			"peer merges by %q but this node merges by %q; refusing to sync until the whole workspace agrees",
+			peer.MergeEngine, mine)
 		return res
 	}
 	// Record what this peer has acknowledged (a conservative lower bound: its
@@ -243,31 +293,36 @@ func (e *Engine) SyncPeer(ctx context.Context, peerID, baseURL string) Result {
 	return res
 }
 
-func (e *Engine) fetchVector(ctx context.Context, base, auth string) (map[string]string, string, string, string, error) {
+// peerInfo is what the /api/sync/vector handshake tells us about a peer.
+type peerInfo struct {
+	Vector      map[string]string `json:"vector"`
+	NodeID      string            `json:"node_id"`
+	OrgID       string            `json:"org_id"`
+	PubKey      string            `json:"pubkey"`
+	MergeEngine string            `json:"merge_engine"`
+}
+
+func (e *Engine) fetchVector(ctx context.Context, base, auth string) (peerInfo, error) {
+	var body peerInfo
 	req, _ := http.NewRequestWithContext(ctx, "GET", base+"/api/sync/vector", nil)
 	req.Header.Set("Authorization", auth)
 	e.signRequest(req, nil)
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, "", "", "", err
+		return body, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, "", "", "", fmt.Errorf("vector: HTTP %d (%s)", resp.StatusCode, statusText(resp))
-	}
-	var body struct {
-		Vector map[string]string `json:"vector"`
-		NodeID string            `json:"node_id"`
-		OrgID  string            `json:"org_id"`
-		PubKey string            `json:"pubkey"`
+		return body, fmt.Errorf("vector: HTTP %d (%s)", resp.StatusCode, statusText(resp))
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, "", "", "", err
+		return body, err
 	}
 	if body.Vector == nil {
 		body.Vector = map[string]string{}
 	}
-	return body.Vector, body.NodeID, body.OrgID, body.PubKey, nil
+	body.MergeEngine = normalizeEngine(body.MergeEngine)
+	return body, nil
 }
 
 func (e *Engine) postOps(ctx context.Context, base, auth string, ops []store.Op) error {

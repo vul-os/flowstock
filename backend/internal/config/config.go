@@ -31,16 +31,22 @@ type Config struct {
 	// enrolled a key (the mesh fails closed). This is a compatibility escape
 	// hatch for mixed-version fleets.
 	SyncSecretFallback bool `json:"sync_secret_fallback,omitempty"`
-	// SubstrateSync, when true, makes the shared DMTAP sync engine
-	// (substrate/SYNC.md) the merge authority instead of FlowStock's own
-	// hand-rolled CRDT. Default false: the built-in engine decides.
+	// SubstrateSync selects the merge authority: the shared DMTAP sync engine
+	// (substrate/SYNC.md), or FlowStock's own hand-rolled CRDT.
+	//
+	// Unset (nil) means the substrate — it is the default as of the version that
+	// introduced this comment, because carrying the suite's audited, vector-
+	// verified algebra beats carrying a second private one. Set it to false to
+	// pin a node to the built-in engine, which stays fully supported and is the
+	// escape hatch if the substrate ever misbehaves in the field.
 	//
 	// It is a deployment-wide switch, not a per-node preference. The two
 	// engines are each convergent but do not share a total order — FlowStock
 	// breaks an HLC tie on node id, the substrate on the author's public key —
 	// so a mesh running both can pick different winners for the same pair of
-	// concurrent writes. Every node in a workspace must agree.
-	SubstrateSync bool `json:"substrate_sync,omitempty"`
+	// concurrent writes. Every node in a workspace must agree; sync.SyncPeer
+	// refuses a round across a mismatch rather than let that diverge silently.
+	SubstrateSync *bool `json:"substrate_sync,omitempty"`
 }
 
 const configName = "flowstock.config.json"
@@ -76,8 +82,15 @@ func Load() *Config {
 	if v := os.Getenv("FLOWSTOCK_SYNC_SECRET_FALLBACK"); v == "1" || v == "true" {
 		cfg.SyncSecretFallback = true
 	}
-	if v := os.Getenv("FLOWSTOCK_SUBSTRATE_SYNC"); v == "1" || v == "true" {
-		cfg.SubstrateSync = true
+	// Accepts both directions, because this one now has a non-false default and
+	// an operator needs a way to say "no" from the environment alone.
+	switch os.Getenv("FLOWSTOCK_SUBSTRATE_SYNC") {
+	case "1", "true":
+		on := true
+		cfg.SubstrateSync = &on
+	case "0", "false":
+		off := false
+		cfg.SubstrateSync = &off
 	}
 
 	// Defaults.
@@ -108,6 +121,10 @@ func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "flowstock.db
 
 // Addr is the host:port listen address.
 func (c *Config) Addr() string { return fmt.Sprintf("%s:%s", c.Host, c.Port) }
+
+// UseSubstrate reports whether the shared DMTAP sync engine is the merge
+// authority. Unset means yes — see the SubstrateSync field.
+func (c *Config) UseSubstrate() bool { return c.SubstrateSync == nil || *c.SubstrateSync }
 
 func readConfigFile() ([]byte, string) {
 	// 1. Walk up from cwd.

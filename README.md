@@ -39,6 +39,15 @@ branches that traded while disconnected always converge to the same totals.
 - 🔄 **Leaderless offline-first sync** — hybrid-logical-clock oplog; catalog
   merges last-writer-wins, stock movements + goods receipts merge by union; any
   topology (pair, hub-and-spoke, mesh); authenticated, fail-closed
+- 🧩 **Merges with the shared DMTAP Sync engine** — FlowStock does not carry a
+  private CRDT any more. Conflicts are resolved by the Vulos suite's one
+  specified, vector-verified implementation of
+  [`substrate/SYNC.md`](https://github.com/vul-os/dmtap) — the *same compiled
+  engine* Ofisi runs, not a second implementation that agrees most of the time.
+  Every op is individually signed, so a replicated change is verified on its own
+  rather than trusted for arriving over an authenticated connection. Nodes
+  advertise their merge engine in the handshake and refuse to sync across a
+  mismatch, because two algebras in one mesh converge only by luck
 - 🏷️ **Self-describing workspaces** — every row and op carries a workspace
   `org_id`; cross-workspace ops are rejected, and a new device _pairs in_ by
   adopting the workspace rather than starting its own
@@ -147,8 +156,18 @@ movements and goods receipts are immutable and merge by union**, which is what
 makes offline multi-branch stock safe. Version vectors are derived from the
 oplog, so sync is stateless and any node can relay any other node's changes.
 The same ops can travel over HTTP **or** a shared folder (Dropbox/Syncthing/USB),
-and one-click compaction snapshots state and prunes acknowledged history. Full
-details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+and one-click compaction snapshots state and prunes acknowledged history.
+
+**Which write wins is decided by the shared DMTAP Sync engine**, not by
+FlowStock. Storage, transport and identity are unchanged — SQLite, the
+mutual-Ed25519 HTTP pull and the folder path, the per-node key — and the
+substrate supplies only the algebra: catalog rows map to its last-writer-wins
+register, the two ledgers to its add-only set, which is exactly the behaviour
+described above. FlowStock's own CRDT is still carried and still tested, and
+`substrate_sync: false` pins a node to it. Because the two break an exact
+timestamp tie differently, the merge engine is part of the sync handshake and a
+round across a mismatch is refused rather than allowed to diverge in silence.
+Full details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/SYNC.md](docs/SYNC.md).
 
 ## Configuration

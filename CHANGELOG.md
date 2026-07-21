@@ -9,16 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Optional shared sync engine** (`substrate_sync`, default off): the
-  suite-wide DMTAP sync engine can decide how concurrent writes merge instead
-  of FlowStock's own CRDT. Storage, transport and identity are unchanged; the
-  per-node Ed25519 key additionally signs every op, so replicated changes are
-  individually verified rather than trusted for arriving over an authenticated
-  connection. `GET /api/substrate` reports a `state_root` — a content address
-  over the whole replicated state — so two branches can be checked for
-  agreement over everything, not just what is on screen. It is a
-  deployment-wide switch: both engines converge, but they break an exact
-  timestamp tie differently, so a workspace must run one or the other.
+- **The shared DMTAP sync engine is now the merge authority** (`substrate_sync`,
+  **default on**): the suite-wide engine decides how concurrent writes merge,
+  instead of FlowStock's own CRDT. Storage, transport and identity are
+  unchanged; the per-node Ed25519 key additionally signs every op, so replicated
+  changes are individually verified rather than trusted for arriving over an
+  authenticated connection. `GET /api/substrate` reports a `state_root` — a
+  content address over the whole replicated state — so two branches can be
+  checked for agreement over everything, not just what is on screen. FlowStock's
+  built-in CRDT is still carried and still tested; `substrate_sync: false` pins a
+  node to it.
+- **The merge engine is part of the sync handshake.** Both engines converge but
+  break an exact timestamp tie differently (node id vs author public key), so a
+  mesh running both can pick different winners for the same pair of concurrent
+  writes — silently, with every node reporting a healthy sync. `GET
+  /api/sync/vector` now advertises `merge_engine`, and a round between two nodes
+  that disagree is refused with an error naming both. A peer too old to send the
+  field reads as the built-in engine.
+
+### Upgrading
+
+- **Rolling upgrade pauses sync between mismatched pairs**, by design: upgraded
+  nodes refuse rounds with nodes still on the built-in engine, and resume on
+  their own once every node is upgraded. To avoid the pause entirely, set
+  `substrate_sync: false` across the fleet first, upgrade, then remove the
+  setting node by node.
 
 - **Self-describing workspaces**: every synced row and op carries an `org_id`
   (generated on first run). Cross-workspace ops are rejected on apply and a
