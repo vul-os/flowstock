@@ -209,7 +209,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -235,14 +235,14 @@ const Dashboard = () => {
       </StatGrid>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
         {/* Sales by month */}
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Sales — last 6 months</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
+            <div className="h-64">
               {hasSales ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -306,7 +306,7 @@ const Dashboard = () => {
                 information the list did not — and an arc is the harder shape to
                 compare two values with. Bars share one baseline, so "Power
                 Tools is roughly twice Hand Tools" is readable at a glance. */}
-            <div className="h-80">
+            <div className="h-64">
               {pieData.length > 0 ? (
                 <ul className="flex h-full flex-col justify-center gap-4">
                   {pieData.map((entry, index) => {
@@ -351,7 +351,7 @@ const Dashboard = () => {
       </div>
 
       {/* Bottom Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Low stock */}
         <Card>
           <CardHeader>
