@@ -146,7 +146,8 @@ const ProductTable = ({
               <TableCell className="font-medium">
                 {product.name}
                 <Badge variant="outline" className="ml-2">
-                  {product.variants.length} variations
+                  {product.variants.length} variation
+                  {product.variants.length === 1 ? "" : "s"}
                 </Badge>
                 {product.variants.some((v) =>
                   isLowStock(v, stockTotals.get(v.id) || 0),
@@ -165,7 +166,22 @@ const ProductTable = ({
                 )}
               </TableCell>
               <TableCell>
-                <div className="flex justify-end gap-2">
+                {/* Four peer actions, all icon-only. "Add variation" used to be
+                    a labelled outline button, which put ten heavy buttons down
+                    the right edge and made them the loudest thing on a page
+                    whose subject is the catalogue. */}
+                <div className="flex justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Add variation"
+                    onClick={() => onAddVariation(product)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="sr-only">
+                      Add variation to {product.name}
+                    </span>
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -173,6 +189,7 @@ const ProductTable = ({
                     onClick={() => navigate(`/products/${product.id}`)}
                   >
                     <Eye className="h-4 w-4" />
+                    <span className="sr-only">View {product.name}</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -181,6 +198,7 @@ const ProductTable = ({
                     onClick={() => onEdit(product)}
                   >
                     <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Edit {product.name}</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -189,14 +207,7 @@ const ProductTable = ({
                     onClick={() => onDelete(product)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onAddVariation(product)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Variation
+                    <span className="sr-only">Delete {product.name}</span>
                   </Button>
                 </div>
               </TableCell>

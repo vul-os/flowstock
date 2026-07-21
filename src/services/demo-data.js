@@ -427,7 +427,12 @@ export function seedDemoData() {
       created_at: iso(when),
     });
 
-  // ── opening stock: goods received ~90 days ago at each branch ──────────────
+  // ── opening stock: goods received just over a year ago at each branch ──────
+  //
+  // The demo has to cover a full trailing year, because that is the window the
+  // Sales report charts and the dashboard's six-month bars read. Opening the
+  // books 90 days back left nine of twelve months empty, which does not read as
+  // a quiet quarter — it reads as a broken chart.
   variants.forEach((v) => {
     branches.forEach((b, i) => {
       const base = Math.max(
@@ -441,11 +446,37 @@ export function seedDemoData() {
         "receive",
         "manual",
         "",
-        daysAgo(92 - i, 9),
+        daysAgo(380 - i, 9),
         "opening stock",
       );
     });
   });
+
+  // ── replenishment: a standing order every two months ───────────────────────
+  //
+  // A year of selling against a single opening receipt would run every line to
+  // zero by about month four, and the sales curve would die with it. Restocking
+  // on a cadence is also just what the business being modelled actually does.
+  for (let ago = 320; ago > 0; ago -= 60) {
+    variants.forEach((v) => {
+      branches.forEach((b, i) => {
+        const qty = Math.max(
+          2,
+          Math.round((v.reorder_point || 5) * (1.8 - i * 0.35)),
+        );
+        move(
+          v.id,
+          b.id,
+          qty,
+          "receive",
+          "manual",
+          "",
+          daysAgo(ago - i, 9),
+          "replenishment",
+        );
+      });
+    });
+  }
 
   // ── purchase orders ────────────────────────────────────────────────────────
   const poDefs = [
@@ -560,7 +591,9 @@ export function seedDemoData() {
         ? pick(["paid", "confirmed", "confirmed"])
         : pick(["confirmed", "draft"]);
   let orderNo = 101;
-  for (let ago = 70; ago >= 0; ago -= between(1, 4)) {
+  // A full trailing year, so the twelve-month Sales report and the six-month
+  // dashboard chart both have something to draw across their whole domain.
+  for (let ago = 365; ago >= 0; ago -= between(1, 4)) {
     const customer = pick(customers);
     const branch = pick(branches);
     const status = statusFor(ago);
@@ -613,7 +646,10 @@ export function seedDemoData() {
       id,
       branch_id: branch.id,
       customer_id: customer.id,
-      order_number: `ORD-2026-${orderNo++}`,
+      // The year comes from the order's own date: the demo now spans a full
+      // trailing year, so it crosses a new year and a fixed prefix would be a
+      // visible lie on every order older than January.
+      order_number: `ORD-${daysAgo(ago).getFullYear()}-${orderNo++}`,
       order_date: iso(daysAgo(ago)),
       due_date: iso(daysAgo(ago - 14)),
       payment_terms: customer.payment_terms || "30 days",

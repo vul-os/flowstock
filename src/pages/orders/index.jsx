@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/state";
+import { StatCard, StatGrid } from "@/components/ui/stat";
 import OrderDialog from "./dialog";
 
 const STATUS_BADGE = {
@@ -193,57 +194,25 @@ const OrdersPage = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="data-figure text-2xl font-semibold">
-              {orders.length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
-            <PencilLine className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="data-figure text-2xl font-semibold">
-              {orders.filter((o) => o.status === "draft").length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Pending Payment
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="data-figure text-2xl font-semibold">
-              {fmtMoney(pendingPayment)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {confirmedOrders.length} orders
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="data-figure text-2xl font-semibold">
-              {fmtMoney(paidTotal)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatGrid className="lg:grid-cols-4">
+        <StatCard title="Total orders" value={orders.length} icon={FileText} />
+        <StatCard
+          title="Drafts"
+          value={orders.filter((o) => o.status === "draft").length}
+          icon={PencilLine}
+        />
+        <StatCard
+          title="Pending payment"
+          value={fmtMoney(pendingPayment)}
+          detail={`${confirmedOrders.length} order${confirmedOrders.length === 1 ? "" : "s"}`}
+          icon={CreditCard}
+        />
+        <StatCard
+          title="Paid"
+          value={fmtMoney(paidTotal)}
+          icon={CheckCircle2}
+        />
+      </StatGrid>
 
       {/* Orders Table */}
       <Card>

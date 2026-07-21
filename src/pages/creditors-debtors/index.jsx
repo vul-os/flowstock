@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Scale, Wallet } from "lucide-react";
 import { api } from "@/services/api";
 import { useTables, useWorkspace } from "@/context/workspace-context";
 import { partyBalances } from "@/lib/reports";
@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/state";
+import { StatCard, StatGrid } from "@/components/ui/stat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -372,36 +373,20 @@ const CreditorsDebtorsPage = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Payable</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="data-figure text-2xl font-semibold text-destructive">
-              {fmtMoney(balances.total_payable)}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Owed to {balances.creditors.length} supplier
-              {balances.creditors.length === 1 ? "" : "s"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Receivable</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="data-figure text-2xl font-semibold text-success">
-              {fmtMoney(balances.total_receivable)}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Owed by {balances.debtors.length} customer
-              {balances.debtors.length === 1 ? "" : "s"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatGrid className="lg:grid-cols-2">
+        <StatCard
+          title="Total payable"
+          value={fmtMoney(balances.total_payable)}
+          detail={`Owed to ${balances.creditors.length} supplier${balances.creditors.length === 1 ? "" : "s"}`}
+          icon={Scale}
+        />
+        <StatCard
+          title="Total receivable"
+          value={fmtMoney(balances.total_receivable)}
+          detail={`Owed by ${balances.debtors.length} customer${balances.debtors.length === 1 ? "" : "s"}`}
+          icon={Wallet}
+        />
+      </StatGrid>
 
       <Card>
         <CardHeader>

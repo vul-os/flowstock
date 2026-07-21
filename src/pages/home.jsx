@@ -2,12 +2,12 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { StatCard, StatGrid } from "@/components/ui/stat";
+import { EmptyState } from "@/components/ui/state";
 import {
   Package2,
   AlertTriangle,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   Box,
   ShoppingCart,
   Wallet,
@@ -21,9 +21,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
 import { useChartTheme } from "@/lib/chart-theme";
@@ -51,14 +48,6 @@ const KIND_BADGE = {
   count: "bg-signal-muted text-signal-text",
   reversal: "bg-signal-muted text-signal-text",
 };
-
-const EmptyState = ({ icon: Icon, title, hint }) => (
-  <div className="flex flex-col items-center justify-center py-10 text-center">
-    {Icon && <Icon className="h-8 w-8 text-muted-foreground mb-3" />}
-    <p className="text-sm font-medium text-muted-foreground">{title}</p>
-    {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
-  </div>
-);
 
 const fmtDay = (iso) => {
   if (!iso) return "";
@@ -182,41 +171,40 @@ const Dashboard = () => {
     {
       title: "Sales this month",
       value: fmtMoney(thisMonth.total),
-      icon: <TrendingUp className="h-6 w-6 text-success" />,
-      change:
-        delta === null ? null : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`,
-      trend: delta === null ? null : delta >= 0 ? "up" : "down",
-      details: `${thisMonth.count} order${thisMonth.count === 1 ? "" : "s"} · vs last month`,
+      icon: TrendingUp,
+      tone: "lead",
+      delta,
+      detail: `${thisMonth.count} order${thisMonth.count === 1 ? "" : "s"} · vs last month`,
     },
     {
       title: "Open orders",
       value: String(openOrders),
-      icon: <ShoppingCart className="h-6 w-6 text-primary" />,
-      details: "Draft + confirmed",
+      icon: ShoppingCart,
+      detail: "Draft + confirmed",
     },
     {
       title: "Receivable",
       value: fmtMoney(balances.total_receivable),
-      icon: <Wallet className="h-6 w-6 text-primary" />,
-      details: `${balances.debtors.length} debtor${balances.debtors.length === 1 ? "" : "s"}`,
+      icon: Wallet,
+      detail: `${balances.debtors.length} debtor${balances.debtors.length === 1 ? "" : "s"}`,
     },
     {
       title: "Payable",
       value: fmtMoney(balances.total_payable),
-      icon: <Scale className="h-6 w-6 text-primary" />,
-      details: `${balances.creditors.length} creditor${balances.creditors.length === 1 ? "" : "s"}`,
+      icon: Scale,
+      detail: `${balances.creditors.length} creditor${balances.creditors.length === 1 ? "" : "s"}`,
     },
     {
       title: "Inventory value",
       value: fmtMoney(valuation.total_cost),
-      icon: <Box className="h-6 w-6 text-cyan-600" />,
-      details: `At cost · ${fmtMoney(valuation.total_retail)} retail`,
+      icon: Box,
+      detail: `At cost · ${fmtMoney(valuation.total_retail)} retail`,
     },
     {
       title: "Low stock",
       value: String(low.length),
-      icon: <AlertTriangle className="h-6 w-6 text-signal-text" />,
-      details: "At or below reorder point",
+      icon: AlertTriangle,
+      detail: "At or below reorder point",
     },
   ];
 
@@ -240,40 +228,11 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <StatGrid>
         {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                {stat.icon}
-                {stat.change && (
-                  <span
-                    className={`text-sm font-medium ${
-                      stat.trend === "up" ? "text-success" : "text-destructive"
-                    }`}
-                  >
-                    {stat.change}
-                    {stat.trend === "up" ? (
-                      <ArrowUpRight className="h-4 w-4 inline ml-1" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4 inline ml-1" />
-                    )}
-                  </span>
-                )}
-              </div>
-              <div className="mt-4">
-                <p className="data-figure whitespace-nowrap text-xl font-semibold leading-tight">
-                  {stat.value}
-                </p>
-                <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stat.details}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard key={stat.title} {...stat} />
         ))}
-      </div>
+      </StatGrid>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -328,7 +287,7 @@ const Dashboard = () => {
                 <EmptyState
                   icon={TrendingUp}
                   title="No sales yet"
-                  hint="Confirmed and paid orders will appear here."
+                  description="Confirmed and paid orders will appear here."
                 />
               )}
             </div>
@@ -341,74 +300,49 @@ const Dashboard = () => {
             <CardTitle>Sales by category</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* A ranked bar list rather than a donut. The categories are
+                already sorted by value and every figure was being printed in
+                the legend beside the ring, so the ring was carrying no
+                information the list did not — and an arc is the harder shape to
+                compare two values with. Bars share one baseline, so "Power
+                Tools is roughly twice Hand Tools" is readable at a glance. */}
             <div className="h-80">
               {pieData.length > 0 ? (
-                <div className="flex h-full flex-col">
-                  <div className="min-h-0 flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          innerRadius={48}
-                          outerRadius={78}
-                          paddingAngle={1}
-                          dataKey="total"
-                          nameKey="name"
-                          stroke={chart.surface}
-                          strokeWidth={2}
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell
-                              key={entry.name}
-                              fill={
+                <ul className="flex h-full flex-col justify-center gap-4">
+                  {pieData.map((entry, index) => {
+                    const top = pieData[0]?.total || 0;
+                    const pct = top > 0 ? (entry.total / top) * 100 : 0;
+                    return (
+                      <li key={entry.name} className="space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="truncate text-muted-foreground">
+                            {entry.name}
+                          </span>
+                          <span className="data-figure shrink-0 tabular-nums">
+                            {fmtMoney(entry.total)}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-sm bg-muted">
+                          <div
+                            className="h-full rounded-sm"
+                            style={{
+                              width: `${pct}%`,
+                              background:
                                 chart.categorical[
                                   index % chart.categorical.length
-                                ]
-                              }
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={chart.tooltip}
-                          formatter={(value) => fmtMoney(value)}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ul className="mt-1 space-y-1">
-                    {pieData.map((entry, index) => (
-                      <li
-                        key={entry.name}
-                        className="flex items-center gap-2 text-xs"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                          style={{
-                            background:
-                              chart.categorical[
-                                index % chart.categorical.length
-                              ],
-                          }}
-                        />
-                        <span className="truncate text-muted-foreground">
-                          {entry.name}
-                        </span>
-                        <span className="data-figure ml-auto shrink-0 text-foreground">
-                          {fmtMoney(entry.total)}
-                        </span>
+                                ],
+                            }}
+                          />
+                        </div>
                       </li>
-                    ))}
-                  </ul>
-                </div>
+                    );
+                  })}
+                </ul>
               ) : (
                 <EmptyState
                   icon={Package2}
                   title="No category sales yet"
-                  hint="Revenue is grouped by product category."
+                  description="Revenue is grouped by product category."
                 />
               )}
             </div>
@@ -436,7 +370,7 @@ const Dashboard = () => {
               <EmptyState
                 icon={Package2}
                 title="All stock levels healthy"
-                hint="Items at or below their reorder point show up here."
+                description="Items at or below their reorder point show up here."
               />
             ) : (
               <div className="space-y-3">
@@ -494,7 +428,7 @@ const Dashboard = () => {
               <EmptyState
                 icon={Box}
                 title="No stock movements yet"
-                hint="Receipts, sales and adjustments will appear here."
+                description="Receipts, sales and adjustments will appear here."
               />
             ) : (
               <div className="space-y-3">

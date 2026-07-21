@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/state";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, ArrowUpDown, Download, FileBarChart } from "lucide-react";
 import {
@@ -109,14 +110,6 @@ function makeCsvExporter(toast, filename, buildRows) {
     }
   };
 }
-
-const EmptyState = ({ title, hint }) => (
-  <div className="flex flex-col items-center justify-center py-12 text-center">
-    <FileBarChart className="h-8 w-8 text-muted-foreground mb-3" />
-    <p className="text-sm font-medium text-muted-foreground">{title}</p>
-    {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
-  </div>
-);
 
 const ReportShell = ({ title, description, onExport, children }) => (
   <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -229,8 +222,9 @@ function InventoryValuationReport({ data, levels, fmtMoney, toast }) {
         <CardContent className="pt-6">
           {valuation.lines.length === 0 ? (
             <EmptyState
+              icon={FileBarChart}
               title="No products yet"
-              hint="Add products and stock to see a valuation."
+              description="Add products and stock to see a valuation."
             />
           ) : (
             <Table>
@@ -399,8 +393,9 @@ function StockMovementsReport({ data, toast }) {
 
           {filtered.length === 0 ? (
             <EmptyState
+              icon={FileBarChart}
               title="No movements match"
-              hint="Try clearing the filters, or record some stock activity first."
+              description="Try clearing the filters, or record some stock activity first."
             />
           ) : (
             <>
@@ -536,8 +531,9 @@ function LowStockReport({ data, levels, toast }) {
         <CardContent className="pt-6">
           {rows.length === 0 ? (
             <EmptyState
+              icon={FileBarChart}
               title="All stock levels healthy"
-              hint="Nothing is at or below its reorder point right now."
+              description="Nothing is at or below its reorder point right now."
             />
           ) : (
             <Table>
@@ -692,8 +688,9 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
         <CardContent>
           {!hasSales ? (
             <EmptyState
+              icon={FileBarChart}
               title="No sales yet"
-              hint="Confirm or complete an order to see it here."
+              description="Confirm or complete an order to see it here."
             />
           ) : (
             <>
@@ -785,7 +782,7 @@ function SalesReport({ data, fmtMoney, currency, toast }) {
           </CardHeader>
           <CardContent>
             {topProducts.length === 0 ? (
-              <EmptyState title="No product sales yet" />
+              <EmptyState icon={FileBarChart} title="No product sales yet" />
             ) : (
               <Table>
                 <TableHeader>
@@ -979,8 +976,9 @@ function AccountsReport({ data, fmtMoney, toast }) {
         <CardContent>
           {balances.debtors.length === 0 ? (
             <EmptyState
+              icon={FileBarChart}
               title="No outstanding debtors"
-              hint="Confirmed unpaid orders create debtors."
+              description="Confirmed unpaid orders create debtors."
             />
           ) : (
             <BalanceTable
@@ -1001,8 +999,9 @@ function AccountsReport({ data, fmtMoney, toast }) {
         <CardContent>
           {balances.creditors.length === 0 ? (
             <EmptyState
+              icon={FileBarChart}
               title="No outstanding creditors"
-              hint="Sent or received purchase orders create creditors."
+              description="Sent or received purchase orders create creditors."
             />
           ) : (
             <BalanceTable
@@ -1048,8 +1047,9 @@ const ReportPage = () => {
         <Card>
           <CardContent className="pt-6">
             <EmptyState
+              icon={FileBarChart}
               title="Report not found"
-              hint={`There is no report called "${slug}".`}
+              description={`There is no report called "${slug}".`}
             />
             <div className="text-center pb-4">
               <Link

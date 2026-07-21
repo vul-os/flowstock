@@ -33,6 +33,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { StatCard, StatGrid } from "@/components/ui/stat";
 import { toast } from "@/components/ui/use-toast";
 import { api } from "@/services/api";
 import {
@@ -139,18 +140,6 @@ const FilterDialog = React.memo(
   ),
 );
 FilterDialog.displayName = "FilterDialog";
-
-const StatCard = ({ title, value, icon }) => (
-  <Card>
-    <CardContent className="flex items-center justify-between p-4">
-      <div>
-        <p className="text-sm text-muted-foreground">{title}</p>
-        <p className="data-figure text-2xl font-semibold">{value}</p>
-      </div>
-      {icon}
-    </CardContent>
-  </Card>
-);
 
 const errText = (err) => String(err?.message || err);
 
@@ -366,28 +355,16 @@ const ProductManagement = () => {
           Your catalog — products, their variations and SKUs.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StatGrid className="lg:grid-cols-4">
+        <StatCard title="Products" value={stats.products} icon={Package2} />
+        <StatCard title="Variations" value={stats.variants} icon={Boxes} />
+        <StatCard title="Low stock" value={stats.low} icon={AlertTriangle} />
         <StatCard
-          title="Products"
-          value={stats.products}
-          icon={<Package2 className="h-6 w-6 text-primary" />}
-        />
-        <StatCard
-          title="Variations"
-          value={stats.variants}
-          icon={<Boxes className="h-6 w-6 text-success" />}
-        />
-        <StatCard
-          title="Low Stock"
-          value={stats.low}
-          icon={<AlertTriangle className="h-6 w-6 text-signal-text" />}
-        />
-        <StatCard
-          title="Stock Value (cost)"
+          title="Stock value (cost)"
           value={fmtMoney(stats.stockValue)}
-          icon={<Banknote className="h-6 w-6 text-violet-600" />}
+          icon={Banknote}
         />
-      </div>
+      </StatGrid>
 
       <Card>
         <CardHeader>
