@@ -6,7 +6,7 @@
 Products, stock, orders, purchasing, and accounts — in one self-hosted binary
 that keeps every branch in sync, even when branches go offline.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-0F6D7A.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-0F6D7A.svg)](LICENSE-MIT)
 [![Version](https://img.shields.io/badge/version-1.0.0-0F6D7A.svg)](CHANGELOG.md)
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
@@ -244,4 +244,5 @@ compatibility matters.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) — © VulOS. FlowStock is a VulOS
+project; source and issues at [github.com/vul-os/flowstock](https://github.com/vul-os/flowstock).
