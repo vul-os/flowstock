@@ -12,10 +12,16 @@
  *
  * If a dev server is already running at BASE_URL it is reused; otherwise one
  * is started and stopped automatically.
+ *
+ * Every capture is verified before the run is called a success: the screen has
+ * to mount, raise no uncaught page error, and produce an image too large to be
+ * a flat blank. A run with any failure exits non-zero and names the screens.
+ * This is not belt-and-braces — an earlier version reported ten green ticks
+ * while writing fourteen blank files, which then got committed.
  */
 
 import { chromium } from "playwright";
-import { mkdirSync } from "fs";
+import { mkdirSync, statSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
@@ -29,6 +35,14 @@ const OUT_DIR =
     : resolve(ROOT, "docs", "screenshots");
 const BASE_URL = process.env.BASE_URL || "http://localhost:5173";
 const VIEWPORT = { width: 1440, height: 900 };
+
+// A 1440×900 PNG of one flat background colour compresses to about 7 KB; a real
+// screen is 90–200 KB. Anything under this floor rendered nothing, whatever the
+// DOM claimed.
+const MIN_BYTES = 20_000;
+// A rendered screen carries the nav chrome plus its own content. The shell
+// alone is ~1.3 K characters, so this only catches a page that failed to mount.
+const MIN_TEXT = 400;
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -77,20 +91,57 @@ async function run() {
   }, THEME);
   const page = await ctx.newPage();
 
+  // Every uncaught React/runtime error on the page, collected per shot. Without
+  // this a crashed screen is captured as a blank image and reported as a tick.
+  let pageErrors = [];
+  page.on("pageerror", (e) => pageErrors.push(e.message || String(e)));
+
+  const failures = [];
+
   async function shot(hash, name, prepare) {
+    pageErrors = [];
+
+    // Navigate, then force a real reload. `goto` between two URLs that differ
+    // only in their hash is a same-document navigation: the app is not
+    // re-executed. That is how a single crashed screen used to poison every
+    // shot after it — the dead app stayed mounted and each subsequent capture
+    // was the same blank page. Reloading boots the app fresh at this route, so
+    // a failure is contained to the screen that caused it.
     await page.goto(`${BASE_URL}/#${hash}`, { waitUntil: "domcontentloaded" });
-    await page
-      .waitForFunction(() => document.body.innerText.length > 300, {
-        timeout: 15000,
-      })
-      .catch(() => {});
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    let mounted = true;
+    try {
+      await page.waitForFunction(
+        (min) => document.body.innerText.length > min,
+        MIN_TEXT,
+        { timeout: 15000 },
+      );
+    } catch {
+      // Deliberately not swallowed — this used to be `.catch(() => {})`, which
+      // turned "the page never rendered" into "carry on and screenshot it".
+      mounted = false;
+    }
+
     await sleep(1100); // charts/animations settle
     if (prepare) await prepare();
     await page.screenshot({
       path: resolve(OUT_DIR, `${name}.png`),
       fullPage: false,
     });
-    console.log(`  ✓  ${name}.png`);
+
+    const bytes = statSync(resolve(OUT_DIR, `${name}.png`)).size;
+    const why = [];
+    if (!mounted) why.push(`never rendered (<${MIN_TEXT} chars of text)`);
+    if (bytes < MIN_BYTES) why.push(`blank image (${bytes} bytes)`);
+    if (pageErrors.length) why.push(`page error: ${pageErrors[0]}`);
+
+    if (why.length) {
+      failures.push({ name, hash, why });
+      console.log(`  ✗  ${name}.png — ${why.join("; ")}`);
+    } else {
+      console.log(`  ✓  ${name}.png`);
+    }
   }
 
   await shot("/", "hero");
@@ -115,7 +166,22 @@ async function run() {
 
   await browser.close();
   stopVite();
-  console.log(`\nDone! Screenshots written to ${OUT_DIR}\n`);
+
+  if (failures.length) {
+    console.error(
+      `\n${failures.length} of 10 screenshots failed — docs/screenshots is NOT updated correctly:\n`,
+    );
+    for (const f of failures) {
+      console.error(`  ${f.name}.png  (#${f.hash})`);
+      for (const w of f.why) console.error(`      ${w}`);
+    }
+    console.error(
+      "\nThese files are on disk but wrong. Fix the pages, then re-run.\n",
+    );
+    process.exit(1);
+  }
+
+  console.log(`\nDone! ${OUT_DIR} — all screens verified non-blank.\n`);
 }
 
 run().catch((err) => {
