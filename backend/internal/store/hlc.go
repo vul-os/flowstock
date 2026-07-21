@@ -86,6 +86,26 @@ func formatHLC(ms int64, counter uint32, node string) string {
 	return fmt.Sprintf("%013d-%04x-%s", ms, counter, node)
 }
 
+// FormatHLC is formatHLC's hardened, exported counterpart for callers outside
+// this file that need to spell a timestamp from field values NOT produced by
+// this clock's own Tick/Observe — e.g. a verdict handed back by a different
+// engine (substrate.Engine.flowstockHLC resolves a DMTAP HLC, whose Wall is
+// uint64 and Counter is uint32, into FlowStock's string form) or a row read
+// out of an untrusted snapshot file. Such a value has never passed through
+// bump()'s spill logic, so it can carry exactly the out-of-width counter or
+// wall this package's own width bounds exist to rule out.
+//
+// ok is false, and the string empty, when ms or counter would render outside
+// the fixed width ParseHLC requires — the same rejection ParseHLC applies on
+// the way in, applied here on the way out, so nothing constructs a string
+// whose lexical order could diverge from its numeric order.
+func FormatHLC(ms int64, counter uint32, node string) (string, bool) {
+	if ms < 0 || ms > maxWallMS || counter > maxCounter {
+		return "", false
+	}
+	return formatHLC(ms, counter, node), true
+}
+
 // bump advances the logical counter by one, spilling into the wall field when
 // the counter would outgrow the four hex digits "%04x" gives it. Spilling keeps
 // the timestamp strictly greater than the previous one AND keeps every field

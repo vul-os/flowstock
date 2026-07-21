@@ -172,6 +172,14 @@ func (s *Store) ImportSnapshot(snap *Snapshot) (int, error) {
 				RowID:   asStr(row["id"]),
 				Deleted: asInt(row["deleted"]) != 0,
 			}
+			// A snapshot file's per-row hlc is untrusted the same way an op's is
+			// (see ApplyOps): writeRow below compares it lexically in its LWW
+			// guard, so a value outside ParseHLC's fixed width must never reach
+			// it — the same network-reachable order-inversion class, this time
+			// arriving via an imported snapshot rather than a live sync round.
+			if _, _, _, ok := ParseHLC(op.HLC); !ok {
+				continue
+			}
 			payload := map[string]any{}
 			for k, v := range row {
 				if k == "id" || k == "hlc" || k == "deleted" || k == "org_id" {

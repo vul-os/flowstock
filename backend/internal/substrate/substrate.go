@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	dmtapsync "github.com/vul-os/envoir/bindings/go"
@@ -338,12 +339,29 @@ func (e *Engine) Stats() Stats {
 // is a public key in the algebra and a node id in FlowStock, so the mapping is
 // only possible for a node whose ops this replica has seen — which is every node
 // whose op could have won.
+//
+// h.Wall and h.Counter come from the substrate engine's own domain (uint64 and
+// uint32), not from this node's HLC clock — they never passed through bump()'s
+// spill logic, so nothing stops a resolved cell from carrying a value wider
+// than FlowStock's fixed-width string format allows. store.FormatHLC is the
+// same width check ParseHLC applies on the way in, applied here on the way
+// out: an out-of-width verdict is reported as "" (the same signal already used
+// above for "no FlowStock node maps to this author") rather than rendered as a
+// string whose lexical order would silently diverge from its numeric order —
+// exactly the hazard store/hlc.go's own width bounds exist to rule out.
 func (e *Engine) flowstockHLC(h dmtapsync.HLC) string {
 	node, ok := e.nodeOf[h.Author]
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%013d-%04x-%s", h.Wall, h.Counter, node)
+	if h.Wall > math.MaxInt64 {
+		return ""
+	}
+	s, ok := store.FormatHLC(int64(h.Wall), h.Counter, node)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // wallOf is the receiver's "now" for the §3 skew check, taken from the op's own

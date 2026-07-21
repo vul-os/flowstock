@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -237,5 +238,68 @@ func TestStaleOpDoesNotClobber(t *testing.T) {
 	row, _ := b.GetRow("categories", "cat1")
 	if row["name"] != "New" {
 		t.Fatalf("stale op clobbered newer row: %v", row["name"])
+	}
+}
+
+// ApplyOps is where an op authored by another node — a JSON body this node
+// authenticates but does not itself format — crosses into the oplog's and the
+// row table's hlc columns, both of which are compared lexically (MAX(hlc);
+// writeRow's "WHERE excluded.hlc > tbl.hlc" guard). A peer's op.HLC that
+// doesn't round-trip through ParseHLC must never reach either column: it is
+// exactly the string ParseHLC's fixed-width rejection (hlc.go) exists to keep
+// out of that ordered domain — the same network-reachable hazard 0c6beba fixed
+// for the local clock's Observe path, reopened here at a second entry point
+// that fix didn't touch.
+func TestApplyOpsRejectsOutOfWidthRemoteHLC(t *testing.T) {
+	b := newNode(t, "B")
+	for name, badHLC := range map[string]string{
+		"counter one past its width": "1700000000000-10000-A",
+		"wall one digit too wide":    "10000000000000-0001-A",
+		"negative wall":              "-0001-0001-A",
+		"unparseable garbage":        "not-an-hlc-at-all",
+	} {
+		t.Run(name, func(t *testing.T) {
+			op := Op{
+				HLC: badHLC, NodeID: "A", OrgID: "test-org",
+				Tbl: "products", RowID: "bad-" + name,
+				Payload: json.RawMessage(`{"name":"should not land"}`),
+			}
+			applied, err := b.ApplyOps([]Op{op})
+			if err != nil {
+				t.Fatalf("ApplyOps should skip a malformed op, not error: %v", err)
+			}
+			if applied != 0 {
+				t.Fatalf("expected the malformed op to be skipped, got applied=%d", applied)
+			}
+			if n, err := b.oplogCount(); err != nil || n != 0 {
+				t.Fatalf("a malformed hlc must never enter the oplog, got %d rows (err %v)", n, err)
+			}
+			if rows, _ := b.ListRows("products", true); len(rows) != 0 {
+				t.Fatalf("a malformed hlc must never enter the row table, got %d rows", len(rows))
+			}
+		})
+	}
+}
+
+// The companion positive case: a well-formed remote op (right at the width
+// boundary) is still accepted, so the rejection above is about malformed
+// strings specifically, not a regression that blocks legitimate high values.
+func TestApplyOpsAcceptsWellFormedRemoteHLCAtTheWidthBoundary(t *testing.T) {
+	b := newNode(t, "B")
+	op := Op{
+		HLC: "9999999999999-ffff-A", NodeID: "A", OrgID: "test-org",
+		Tbl: "products", RowID: "boundary",
+		Payload: json.RawMessage(`{"name":"at the edge"}`),
+	}
+	applied, err := b.ApplyOps([]Op{op})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applied != 1 {
+		t.Fatalf("expected the well-formed boundary op to apply, got applied=%d", applied)
+	}
+	row, _ := b.GetRow("products", "boundary")
+	if row == nil {
+		t.Fatal("the accepted op did not land in the row table")
 	}
 }

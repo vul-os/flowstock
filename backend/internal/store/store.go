@@ -448,6 +448,15 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 	admitted := make([]bool, len(ops))
 	if s.merger != nil {
 		for i, op := range ops {
+			// op.HLC arrives as a caller-chosen JSON string, from a peer this node
+			// otherwise trusts to authenticate but not to hand-format a timestamp
+			// correctly. Skip rather than admit or persist one outside ParseHLC's
+			// fixed width: it is exactly the string this package's own width bounds
+			// exist to keep out of the ordered domain the oplog's MAX(hlc) and the
+			// row guard below both compare lexically.
+			if _, _, _, ok := ParseHLC(op.HLC); !ok {
+				continue
+			}
 			if _, ok := tableByName(op.Tbl); !ok {
 				continue
 			}
@@ -475,6 +484,15 @@ func (s *Store) ApplyOps(ops []Op) (int, error) {
 	}
 	fresh := 0
 	for i, op := range ops {
+		// Same rejection as the admission loop above, applied again here because
+		// this loop runs unconditionally (there may be no merger at all) and is
+		// the actual write path: appendOplog and writeRow's own LWW guard both
+		// compare op.HLC lexically, so an out-of-width string reaching either one
+		// is the network-reachable order-inversion 0c6beba fixed for the local
+		// clock, reopened at a second entry point.
+		if _, _, _, ok := ParseHLC(op.HLC); !ok {
+			continue
+		}
 		td, ok := tableByName(op.Tbl)
 		if !ok {
 			continue

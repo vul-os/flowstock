@@ -125,3 +125,35 @@ func TestSnapshotImportRebuildsLateJoiner(t *testing.T) {
 		t.Fatalf("joiner vector floor not applied: %s < %s", jv["A"], snap.Vector["A"])
 	}
 }
+
+// A snapshot file's per-row hlc is exactly as untrusted as an op's (see
+// TestApplyOpsRejectsOutOfWidthRemoteHLC in store_test.go): writeRow's LWW
+// guard compares it lexically, so a row whose hlc doesn't round-trip through
+// ParseHLC must be skipped rather than imported. The checksum only proves the
+// file is internally consistent, not that whoever wrote hlc chose a
+// well-formed value.
+func TestSnapshotImportRejectsOutOfWidthRowHLC(t *testing.T) {
+	a := newNode(t, "A")
+	put(t, a, "products", "p1", map[string]any{"name": "Widget"}, false)
+	snap, err := a.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap.Tables["products"][0]["hlc"] = "1700000000000-10000-A" // counter one past its width
+	snap.Checksum = snap.checksumBody()                         // keep the file internally consistent
+	if !snap.Verify() {
+		t.Fatal("precondition: the tampered snapshot should still verify its own checksum")
+	}
+
+	j := newNode(t, "J")
+	n, err := j.ImportSnapshot(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("expected the malformed row to be skipped, got %d applied", n)
+	}
+	if rows, _ := j.ListRows("products", true); len(rows) != 0 {
+		t.Fatalf("a malformed row hlc must never enter the row table, got %d rows", len(rows))
+	}
+}
