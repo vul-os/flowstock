@@ -11,8 +11,6 @@ that keeps every branch in sync, even when branches go offline.
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 
-<sub>Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
-
 _Vulos — rooted in **vula**, the Zulu and Xhosa word for **open**._
 
 ![FlowStock dashboard](docs/screenshots/hero.png)
@@ -31,24 +29,6 @@ branch runs its own copy, works fully offline, and syncs **peer-to-peer** with
 the other branches over the LAN, a VPN, or a tunnel whenever they can reach
 each other. There is no central server. Stock is an append-only ledger, so
 branches that traded while disconnected always converge to the same totals.
-
-## Part of VulOS
-
-**Vulos = free, open-source software + two paid services.** The Vulos OS, all
-its apps, and the app store are OSS and free — you self-host them on a box you
-provision and pay for yourself; Vulos bills only for **Vulos Relay**
-(reachability) and **backup storage**. There is no compute, mail, or app-store
-billing.
-
-The suite: **Vulos OS** (the web-native desktop shell) · **Vulos Office**
-(docs, sheets, slides, PDF, whiteboards) · **Vulos Files** · **Vulos Relay** ·
-**llmux** (sovereign AI gateway) — with mail/calendar/contacts as bring-your-own
-via **lilmail**, and chat/video over established third-party protocols
-(Matrix/Element, Jitsi).
-
-FlowStock runs standalone **and** is hosted as an app by the Vulos OS (embedded
-via `frame_ancestors`). It pairs naturally with a **Vulos Relay** tunnel when
-branches need to sync across the internet without opening ports.
 
 ## Features
 
@@ -246,3 +226,10 @@ compatibility matters.
 
 [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) — © VulOS. FlowStock is a VulOS
 project; source and issues at [github.com/vul-os/flowstock](https://github.com/vul-os/flowstock).
+
+---
+
+<p align="center">
+  <a href="https://vulos.org"><img src="docs/assets/vulos-logo.png" alt="vulos" height="20"></a><br>
+  <sub><a href="https://vulos.org"><b>vulos</b></a> — open by design</sub>
+</p>
