@@ -34,11 +34,16 @@ type Config struct {
 	// SubstrateSync selects the merge authority: the shared DMTAP sync engine
 	// (substrate/SYNC.md), or FlowStock's own hand-rolled CRDT.
 	//
-	// Unset (nil) means the substrate — it is the default as of the version that
-	// introduced this comment, because carrying the suite's audited, vector-
-	// verified algebra beats carrying a second private one. Set it to false to
-	// pin a node to the built-in engine, which stays fully supported and is the
-	// escape hatch if the substrate ever misbehaves in the field.
+	// Unset (nil) defers to the binary's own build-time default — see
+	// defaultUseSubstrate (default_dmtap.go / default_builtin.go). A binary
+	// built with `-tags dmtap` defaults to the substrate, because carrying the
+	// suite's audited, vector-verified algebra beats carrying a second private
+	// one. A plain build carries no substrate binding at all and defaults to
+	// the built-in engine. Either way, set this explicitly to override: false
+	// pins a node to the built-in engine (the escape hatch if the substrate
+	// ever misbehaves in the field, and the only valid value on a plain
+	// build); true forces the substrate on and is fatal at startup on a binary
+	// that was not built with dmtap support.
 	//
 	// It is a deployment-wide switch, not a per-node preference. The two
 	// engines are each convergent but do not share a total order — FlowStock
@@ -123,8 +128,14 @@ func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "flowstock.db
 func (c *Config) Addr() string { return fmt.Sprintf("%s:%s", c.Host, c.Port) }
 
 // UseSubstrate reports whether the shared DMTAP sync engine is the merge
-// authority. Unset means yes — see the SubstrateSync field.
-func (c *Config) UseSubstrate() bool { return c.SubstrateSync == nil || *c.SubstrateSync }
+// authority. Unset defers to the build's own default — see the SubstrateSync
+// field and defaultUseSubstrate.
+func (c *Config) UseSubstrate() bool {
+	if c.SubstrateSync != nil {
+		return *c.SubstrateSync
+	}
+	return defaultUseSubstrate
+}
 
 func readConfigFile() ([]byte, string) {
 	// 1. Walk up from cwd.

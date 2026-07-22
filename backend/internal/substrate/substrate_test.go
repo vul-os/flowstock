@@ -1,3 +1,5 @@
+//go:build dmtap
+
 package substrate_test
 
 import (

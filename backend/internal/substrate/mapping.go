@@ -1,3 +1,5 @@
+//go:build dmtap
+
 // Package substrate expresses FlowStock's replication in the shared DMTAP Sync
 // algebra (substrate/SYNC.md capability ③), so that FlowStock stops carrying its
 // own CRDT and carries the suite's instead.
